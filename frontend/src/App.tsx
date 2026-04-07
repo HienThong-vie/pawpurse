@@ -1,27 +1,36 @@
 import { useState, useEffect } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import ProtectedRoute from "./ProtectedRoute";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 import "./App.css";
+import supabase from "./lib/supabaseClient";
 
 function App() {
-  const [message, setMessage] = useState<string>(""); // this line store API message
-  const [loading, setLoading] = useState<boolean>(true); //loading state
-
-  useEffect(() => {
-    const fetchData = async () => {
-      const reponse = await fetch("http://localhost:8000/");
-      const data = await reponse.json();
-      setMessage(data.message);
-      setLoading(false);
-    };
-    fetchData();
-  }, []);
   return (
-    <>
-      {loading ? (
-        /*if true*/ <p>Loading...</p>
-      ) : (
-        /* if false */ <p>{message}</p>
-      )}
-    </>
+    <Routes>
+      <Route path="/" element={<Navigate to="/login" />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <div>
+              <p>Dashboard coming soon</p>
+              <button
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  window.location.href = "/login";
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
   );
 }
 
