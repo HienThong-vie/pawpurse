@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";
 import Login from "./pages/Login";
