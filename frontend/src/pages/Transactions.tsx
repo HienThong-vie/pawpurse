@@ -12,6 +12,8 @@ function Transactions() {
   const [category, setCategory] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState("");
+  const [is_recurring, setIsRecurring] = useState(false);
+  const [recurring_interval, setRecurringInterval] = useState("");
   //category field
   const [name, setName] = useState("");
   async function fetchTransactions() {
@@ -49,6 +51,8 @@ function Transactions() {
           category,
           note,
           date,
+          is_recurring,
+          recurring_interval,
         }),
       });
     } else {
@@ -75,6 +79,7 @@ function Transactions() {
     setCategory("");
     setNote("");
     setDate("");
+    setIsRecurring(false);
   }
 
   async function handleDelete(id) {
@@ -149,6 +154,24 @@ function Transactions() {
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
+        <label>
+          <input
+            type="checkbox"
+            checked={is_recurring}
+            onChange={(e) => setIsRecurring(e.target.checked)}
+          />
+          Recurring Transaction
+        </label>
+        {is_recurring && (
+          <select
+            value={recurring_interval}
+            onChange={(e) => setRecurringInterval(e.target.value)}
+          >
+            <option value="daily">daily</option>
+            <option value="weekly">weekly</option>
+            <option value="monthly">monthly</option>
+          </select>
+        )}
 
         <button onClick={() => handleSubmit()}>
           {editId ? "Update Transaction" : "Add Transaction"}
