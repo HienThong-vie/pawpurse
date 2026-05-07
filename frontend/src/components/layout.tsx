@@ -50,6 +50,16 @@ function Layout() {
             </li>
             <li className="p-3">
               <NavLink
+                to="/goals"
+                className={({ isActive }) =>
+                  isActive ? "text-orange-500 font-bold" : "text-gray-400"
+                }
+              >
+                Goals
+              </NavLink>
+            </li>
+            <li className="p-3">
+              <NavLink
                 to="/charts"
                 className={({ isActive }) =>
                   isActive ? "text-orange-500 font-bold" : "text-gray-400"
@@ -73,6 +83,14 @@ function Layout() {
 
         <div className="mt-auto">
           <p className="text-gray-400 text-sm p-3">{user?.email}</p>
+          <NavLink
+            to="/settings"
+            className={({ isActive }) =>
+              isActive ? "text-orange-500 font-bold" : "text-gray-400"
+            }
+          >
+            Settings
+          </NavLink>
           <button className="p-3" onClick={handleSignOut}>
             Sign out
           </button>

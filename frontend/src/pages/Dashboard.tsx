@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { formatCurrency } from "../lib/utils";
 
 function Dashboard() {
   const { user } = useAuth();
@@ -11,23 +12,30 @@ function Dashboard() {
     advice: [],
   }); //GET method
   const [loading, setLoading] = useState<boolean>(true);
-
-  async function fetchDashboardData() {
-    const [transData, analysisData] = await Promise.all([
-      fetch(`http://localhost:8000/transactions/?user_id=${user?.id}`).then(
-        (r) => r.json(),
-      ),
-      fetch(`http://localhost:8000/analysis/?user_id=${user?.id}`).then((r) =>
-        r.json(),
-      ),
-    ]);
-    setTransactions(transData);
-    setAnalysis(analysisData);
-    setLoading(false);
-  }
-
+  const [baseCurrency, setBaseCurrency] = useState<string>("USD");
   useEffect(() => {
-    fetchDashboardData();
+    async function init() {
+      // fetch settings first and get value directly
+      const settingsRes = await fetch(
+        `http://localhost:8000/settings/?user_id=${user?.id}`,
+      );
+      const settingsData = await settingsRes.json();
+      setBaseCurrency(settingsData.base_currency);
+
+      // use settingsData.base_currency directly, NOT baseCurrency state
+      const analysisRes = await fetch(
+        `http://localhost:8000/analysis/?user_id=${user?.id}&base_currency=${settingsData.base_currency}`,
+      );
+      const analysisData = await analysisRes.json();
+      const transRes = await fetch(
+        `http://localhost:8000/transactions/?user_id=${user?.id}&base_currency=${settingsData.base_currency}`,
+      );
+      const transData = await transRes.json();
+      setTransactions(transData);
+      setAnalysis(analysisData);
+      setLoading(false);
+    }
+    init();
   }, []);
   let totalIncome = 0;
   let totalExpense = 0;
@@ -49,17 +57,17 @@ function Dashboard() {
         {/* summary cards */}
         <div>
           <p>Total Income</p>
-          <p>${totalIncome.toFixed(2)}</p>
+          <p>{formatCurrency(totalIncome, baseCurrency)}</p>
         </div>
 
         <div>
           <p>Total Expense</p>
-          <p>${totalExpense.toFixed(2)}</p>
+          <p>{formatCurrency(totalExpense, baseCurrency)}</p>
         </div>
 
         <div>
           <p>Balance</p>
-          <p>${balance.toFixed(2)}</p>
+          <p>{formatCurrency(balance, baseCurrency)}</p>
           <p></p>
         </div>
 
@@ -69,7 +77,7 @@ function Dashboard() {
             ([cat, amount]) => (
               <div key={cat}>
                 <span>{cat}</span>
-                <span>${(amount as number).toFixed(2)}</span>
+                <span>{formatCurrency(amount as number, baseCurrency)}</span>
               </div>
             ),
           )}

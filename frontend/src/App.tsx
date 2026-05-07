@@ -7,7 +7,9 @@ import Transactions from "./pages/Transactions";
 import Budget from "./pages/Budget";
 import Charts from "./pages/Charts";
 import Advisor from "./pages/Advisor";
+import Goals from "./pages/Goals";
 import Layout from "./components/layout";
+import Settings from "./pages/Settings";
 import "./App.css";
 import { useAuth } from "./context/AuthContext";
 
@@ -31,8 +33,10 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/transactions" element={<Transactions />} />
         <Route path="/budget" element={<Budget />} />
+        <Route path="/goals" element={<Goals />} />
         <Route path="/charts" element={<Charts />} />
         <Route path="/advisor" element={<Advisor />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>
   );

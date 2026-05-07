@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { formatCurrency } from "../lib/utils";
 
 function Transactions() {
   const { user } = useAuth();
@@ -14,11 +15,12 @@ function Transactions() {
   const [date, setDate] = useState("");
   const [is_recurring, setIsRecurring] = useState(false);
   const [recurring_interval, setRecurringInterval] = useState("");
+  const [baseCurrency, setBaseCurrency] = useState<string>("USD");
   //category field
   const [name, setName] = useState("");
   async function fetchTransactions() {
     const respone = await fetch(
-      `http://localhost:8000/transactions/?user_id=${user?.id}`,
+      `http://localhost:8000/transactions/?user_id=${user?.id}&base_currency=${baseCurrency}`,
       { method: "GET" },
     );
     const data = await respone.json();
@@ -35,11 +37,30 @@ function Transactions() {
   }
 
   useEffect(() => {
-    fetchTransactions();
-    fetchCategories();
+    async function init() {
+      const response = await fetch(
+        `http://localhost:8000/settings/?user_id=${user?.id}`,
+      );
+      const data = await response.json();
+      setBaseCurrency(data.base_currency);
+
+      // use data.base_currency directly here, not the state variable
+      const transResponse = await fetch(
+        `http://localhost:8000/transactions/?user_id=${user?.id}&base_currency=${data.base_currency}`,
+      );
+      const transData = await transResponse.json();
+      setTransactions(transData);
+
+      fetchCategories();
+    }
+    init();
   }, []);
 
   async function handleSubmit() {
+    if (Number(amount) < 0) {
+      alert("amount can not be negative");
+      return;
+    }
     if (editId == null) {
       const respone = await fetch(`http://localhost:8000/transactions/`, {
         method: "POST",
@@ -53,6 +74,7 @@ function Transactions() {
           date,
           is_recurring,
           recurring_interval,
+          currency: baseCurrency,
         }),
       });
     } else {
@@ -225,7 +247,7 @@ function Transactions() {
               <td>{t.date?.split("T")[0]}</td>
               <td>{t.type}</td>
               <td>{t.category}</td>
-              <td>{t.amount}</td>
+              <td>{formatCurrency(t.amount, baseCurrency)}</td>
               <td>{t.note}</td>
               <button onClick={() => handleEdit(t)}>Edit</button>
               <button onClick={() => handleDelete(t.id)}>Delete</button>

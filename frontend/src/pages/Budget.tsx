@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { formatCurrency } from "../lib/utils";
 
 function Budget() {
   const { user } = useAuth();
+  const [editId, setEditId] = useState<number | null>(null);
   //backend
   const [budgets, setBudgets] = useState<any[]>([]); //GET method
   const [categories, setCategories] = useState<any[]>([]); //GET method
@@ -10,15 +12,8 @@ function Budget() {
   const [category, setCategory] = useState("");
   const [limit, setLimit] = useState("");
   const [period, setPeriod] = useState("");
+  const [baseCurrency, setBaseCurrency] = useState<string>("USD");
 
-  async function fetchBudgets() {
-    const response = await fetch(
-      `http://localhost:8000/budgets/?user_id=${user?.id}`,
-      { method: "GET" },
-    );
-    const data = await response.json();
-    setBudgets(data);
-  }
   async function fetchCategories() {
     const respone = await fetch(
       `http://localhost:8000/categories/?user_id=${user?.id}`,
@@ -27,29 +22,73 @@ function Budget() {
     const data = await respone.json();
     setCategories(data);
   }
+  async function fetchBudgets() {
+    const response = await fetch(
+      `http://localhost:8000/budgets/?user_id=${user?.id}&base_currency=${baseCurrency}`,
+      { method: "GET" },
+    );
+    const data = await response.json();
+    setBudgets(data);
+  }
 
   useEffect(() => {
-    if (user.id) {
-      fetchBudgets();
+    async function init() {
+      const response = await fetch(
+        `http://localhost:8000/settings/?user_id=${user?.id}`,
+      );
+      const data = await response.json();
+      setBaseCurrency(data.base_currency);
+
+      const budgetResponse = await fetch(
+        `http://localhost:8000/budgets/?user_id=${user?.id}&base_currency=${data.base_currency}`,
+      );
+      const budgetRes = await budgetResponse.json();
       fetchCategories();
+      setBudgets(budgetRes);
     }
+    init();
   }, []);
 
   async function handleSubmit() {
-    const response = await fetch(`http://localhost:8000/budgets/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_id: user?.id,
-        category,
-        limit: parseFloat(limit),
-        period,
-      }),
-    });
+    if (!category || !limit || !period) {
+      alert("please fill in all fields");
+      return;
+    }
+    if (editId == null) {
+      const response = await fetch(`http://localhost:8000/budgets/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: user?.id,
+          category,
+          limit: parseFloat(limit),
+          period,
+          currency: baseCurrency,
+        }),
+      });
+    } else {
+      const response = await fetch(
+        `http://localhost:8000/budgets/${editId}?user_id=${user?.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            user_id: user?.id,
+            category,
+            limit: parseFloat(limit),
+            period,
+            currency: baseCurrency,
+          }),
+        },
+      );
+    }
     fetchBudgets();
     setCategory("");
     setLimit("");
     setPeriod("");
+    setEditId(null);
   }
   async function handleDelete(budget_id) {
     const respone = await fetch(
@@ -57,6 +96,12 @@ function Budget() {
       { method: "DELETE" },
     );
     fetchBudgets();
+  }
+  async function handleEdit(budget) {
+    setEditId(budget.id);
+    setCategory(budget.category);
+    setLimit(String(budget.limit));
+    setPeriod(budget.period);
   }
   return (
     <div>
@@ -84,7 +129,9 @@ function Budget() {
           <option value="month">Month</option>
         </select>
 
-        <button onClick={() => handleSubmit()}>Add Budget</button>
+        <button onClick={() => handleSubmit()}>
+          {editId ? "Update Budget" : "Add Budget"}
+        </button>
       </div>
       {/* cards field */}
       <div>
@@ -99,7 +146,8 @@ function Budget() {
           return (
             <div key={budget.id}>
               <p>
-                {budget.category} - limit: ${budget.limit} / {budget.period}
+                {budget.category} - limit:{" "}
+                {formatCurrency(budget.limit, baseCurrency)} / {budget.period}
               </p>
 
               {/* progress bars */}
@@ -110,10 +158,12 @@ function Budget() {
                 ></div>
               </div>
               <p>
-                Spent: ${budget.spent} ({budget.percentage?.toFixed(1)}%)
+                Spent: {formatCurrency(budget.spent, baseCurrency)} (
+                {budget.percentage?.toFixed(1)}%)
               </p>
 
               <button onClick={() => handleDelete(budget.id)}>Delete</button>
+              <button onClick={() => handleEdit(budget)}>Edit</button>
             </div>
           );
         })}

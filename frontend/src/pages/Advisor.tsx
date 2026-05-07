@@ -10,18 +10,25 @@ function Advisor() {
     budget_analysis: [],
     advice: [],
   });
-
-  async function fetchAdvisorData() {
-    const response = await fetch(
-      `http://localhost:8000/analysis/?user_id=${user?.id}`,
-      { method: "GET" },
-    );
-    const data = await response.json();
-    setAnalysis(data);
-  }
+  const [baseCurrency, setBaseCurrency] = useState<string>("USD");
 
   useEffect(() => {
-    fetchAdvisorData();
+    async function init() {
+      // fetch settings first and get value directly
+      const settingsRes = await fetch(
+        `http://localhost:8000/settings/?user_id=${user?.id}`,
+      );
+      const settingsData = await settingsRes.json();
+      setBaseCurrency(settingsData.base_currency);
+
+      // use settingsData.base_currency directly, NOT baseCurrency state
+      const analysisRes = await fetch(
+        `http://localhost:8000/analysis/?user_id=${user?.id}&base_currency=${settingsData.base_currency}`,
+      );
+      const analysisData = await analysisRes.json();
+      setAnalysis(analysisData);
+    }
+    init();
   }, []);
 
   function handleSwitchMode() {

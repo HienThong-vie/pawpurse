@@ -1,7 +1,16 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { PieChart, Pie, Cell } from "recharts";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+} from "recharts";
 function Charts() {
   const { user } = useAuth();
   //backend
@@ -13,23 +22,29 @@ function Charts() {
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [activeChart, setActiveChart] = useState<string>("donut");
-
-  async function fetchChartsData() {
-    const [transData, analysisData] = await Promise.all([
-      fetch(`http://localhost:8000/transactions/?user_id=${user?.id}`).then(
-        (r) => r.json(),
-      ),
-      fetch(`http://localhost:8000/analysis/?user_id=${user?.id}`).then((r) =>
-        r.json(),
-      ),
-    ]);
-    setTransactions(transData);
-    setAnalysis(analysisData);
-    setLoading(false);
-  }
-
+  const [baseCurrency, setBaseCurrency] = useState<string>("USD");
   useEffect(() => {
-    fetchChartsData();
+    async function init() {
+      const response = await fetch(
+        `http://localhost:8000/settings/?user_id=${user?.id}`,
+      );
+      const data = await response.json();
+      setBaseCurrency(data.base_currency);
+
+      // use data.base_currency directly here, not the state variable
+      const transResponse = await fetch(
+        `http://localhost:8000/transactions/?user_id=${user?.id}&base_currency=${data.base_currency}`,
+      );
+      const analysisResponse = await fetch(
+        `http://localhost:8000/analysis/?user_id=${user?.id}&base_currency=${data.base_currency}`,
+      );
+      const transRes = await transResponse.json();
+      const analysisRes = await analysisResponse.json();
+      setTransactions(transRes);
+      setAnalysis(analysisRes);
+      setLoading(false);
+    }
+    init();
   }, []);
   const donutData = Object.entries(analysis.spending_by_category || {}).map(
     ([name, value]) => ({ name, value }),
