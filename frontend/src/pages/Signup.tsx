@@ -1,70 +1,154 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { CheckCircle, Mail, Lock, Loader2 } from "lucide-react";
 import supabase from "../lib/supabaseClient";
+import { useToast } from "../context/ToastContext";
 function Signup() {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+  const toast = useToast();
   async function Signing() {
     if (confirmPassword !== password) {
-      alert("Passwords do not match!");
+      toast.error("Passwords do not match");
       return;
     }
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) {
-      alert(error.message);
-    } else if (!error) {
-      alert("Account created! Please log in.");
-      navigate("/login");
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        toast.error(error.message);
+      } else if (!error) {
+        toast.success("Account created! Please log in.");
+        navigate("/login");
+      }
+    } finally {
+      setSubmitting(false);
     }
   }
-  return (
-    <div className=" bg-yellow-50 min-h-screen flex items-center justify-center">
-      <div className="bg-yellow-50 w-100 border border-gray-700 flex flex-col items-center justify-center gap-4">
-        <h1 className="text-orange-500 align-middle font-bold">
-          Smart Finance Tracker
-        </h1>
-        <h2 className=" text-black align-middle font-bold">
-          {" "}
-          Create your account{" "}
-        </h2>
-        <input
-          className="bg-gray-800 text-white rounded-lg p-3 w-70"
-          type="text"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <input
-          className="bg-gray-800 text-white rounded-lg p-3 w-70"
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <input
-          className="bg-gray-800 text-white rounded-lg p-3 w-70"
-          type="password"
-          placeholder="Confirm Password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-        />
 
-        <button
-          onClick={() => Signing()}
-          className="bg-orange-500 text-white rounded-lg p-3 w-50 font-bold"
-        >
-          Sign in
-        </button>
-        <p>
-          {" "}
-          Already have an account? {""}
-          <Link className="text-red-500" to="/login">
-            Login
-          </Link>
-          {""} here
+  const features = [
+    "Track income and expenses",
+    "Set and monitor budgets",
+    "Visualize spending patterns",
+    "Set financial goals",
+  ];
+
+  return (
+    <div className="flex flex-col md:flex-row min-h-screen font-[Inter]">
+      {/* Left panel — compact strip on mobile, full panel on desktop */}
+      <div className="md:w-2/5 bg-emerald-500 text-white p-4 md:p-12 flex md:flex-col items-center md:items-stretch md:justify-between">
+        <div className="flex md:block items-center gap-2 w-full">
+          <div className="flex items-center gap-2 md:mb-12">
+            <span className="inline-block w-3 h-3 rounded-full bg-white" />
+            <span className="text-sm font-semibold tracking-wide">
+              SMART FINANCE TRACKER
+            </span>
+          </div>
+          <div className="hidden md:block">
+            <h1 className="text-4xl font-extrabold tracking-tight leading-tight mb-4">
+              Take control of your finances
+            </h1>
+            <p className="text-emerald-50 text-base mb-10">
+              Everything you need to track, plan, and grow your money — in one
+              clean dashboard.
+            </p>
+            <ul className="flex flex-col gap-3">
+              {features.map((feature) => (
+                <li key={feature} className="flex items-center gap-3 text-sm">
+                  <CheckCircle className="w-5 h-5 shrink-0 text-white" />
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <p className="hidden md:block text-xs text-emerald-100">
+          © {new Date().getFullYear()} Smart Finance Tracker
         </p>
+      </div>
+
+      {/* Right panel */}
+      <div className="flex-1 flex items-center justify-center bg-white dark:bg-[#0f0f0f] p-6 md:p-8">
+        <div className="w-full max-w-sm">
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-1">
+            Create account
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-[#a0a0a0] mb-8">
+            Start your financial journey
+          </p>
+
+          <div className="flex flex-col gap-4">
+            <label className="block">
+              <span className="text-sm font-medium text-gray-700 dark:text-[#e0e0e0] mb-1.5 block">
+                Email
+              </span>
+              <div className="relative">
+                <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#666]" />
+                <input
+                  type="text"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full border border-gray-200 dark:border-[#2a2a2a] rounded-lg pl-10 pr-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#666] bg-white dark:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/40 focus:border-emerald-500 dark:focus:border-[#e8643a]"
+                />
+              </div>
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium text-gray-700 dark:text-[#e0e0e0] mb-1.5 block">
+                Password
+              </span>
+              <div className="relative">
+                <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#666]" />
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full border border-gray-200 dark:border-[#2a2a2a] rounded-lg pl-10 pr-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#666] bg-white dark:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/40 focus:border-emerald-500 dark:focus:border-[#e8643a]"
+                />
+              </div>
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium text-gray-700 dark:text-[#e0e0e0] mb-1.5 block">
+                Confirm password
+              </span>
+              <div className="relative">
+                <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#666]" />
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full border border-gray-200 dark:border-[#2a2a2a] rounded-lg pl-10 pr-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#666] bg-white dark:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/40 focus:border-emerald-500 dark:focus:border-[#e8643a]"
+                />
+              </div>
+            </label>
+
+            <button
+              onClick={() => Signing()}
+              disabled={submitting}
+              className="w-full mt-2 px-4 py-2.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              {submitting ? "Creating account..." : "Create account"}
+            </button>
+          </div>
+
+          <p className="text-sm text-gray-500 dark:text-[#a0a0a0] text-center mt-6">
+            Already have an account?{" "}
+            <Link
+              to="/login"
+              className="text-emerald-600 dark:text-[#e8643a] font-semibold hover:underline"
+            >
+              Log in
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -1,1 +1,43 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Subtle scrollbar that blends with card surfaces */
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #e5e7eb transparent;
+}
+.thin-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+.thin-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.dark .thin-scrollbar {
+  scrollbar-color: #2a2a2a transparent;
+}
+.dark .thin-scrollbar::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+.dark .thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #3a3a3a;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
