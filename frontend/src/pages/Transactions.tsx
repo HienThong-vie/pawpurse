@@ -1,30 +1,30 @@
-import { useState, useEffect } from "react";
-import { Plus, Pencil, Trash2, X, Loader2 } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Plus, Pencil, Trash2, X, Loader2, Search } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { useConfirm } from "../context/ConfirmContext";
-import { formatCurrency } from "../lib/utils";
+import { formatCurrency, formatDate, fetchBaseCurrency } from "../lib/utils";
+import { apiFetch } from "../lib/api";
+import ErrorBanner from "../components/ErrorBanner";
+
+type FieldErrors = {
+  amount?: string;
+  category?: string;
+  date?: string;
+};
 
 type SortKey =
-  | "date-newest"
-  | "date-oldest"
+  | "newest"
+  | "oldest"
   | "amount-high"
   | "amount-low"
   | "category-az";
 
+// Frontend sort applies only to amount/category sorts.
+// Newest/oldest are sorted by the backend via order_by(created_at).
 function applySort(arr: any[], sortBy: SortKey): any[] {
   const sorted = [...arr];
   switch (sortBy) {
-    case "date-newest":
-      sorted.sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-      );
-      break;
-    case "date-oldest":
-      sorted.sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-      );
-      break;
     case "amount-high":
       sorted.sort((a, b) => b.amount - a.amount);
       break;
@@ -35,6 +35,9 @@ function applySort(arr: any[], sortBy: SortKey): any[] {
       sorted.sort((a, b) =>
         String(a.category).localeCompare(String(b.category)),
       );
+      break;
+    default:
+      // newest/oldest: backend has already sorted; leave as-is
       break;
   }
   return sorted;
@@ -47,10 +50,17 @@ function Transactions() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [editId, setEditId] = useState<number | null>(null);
-  const [sortBy, setSortBy] = useState<SortKey>("date-newest");
+  const [sortBy, setSortBy] = useState<SortKey>("newest");
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submittingCategory, setSubmittingCategory] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">(
+    "all",
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [loading, setLoading] = useState(true);
   //form field
   const [amount, setAmount] = useState("");
   const [type, setType] = useState("expense");
@@ -62,75 +72,105 @@ function Transactions() {
   const [baseCurrency, setBaseCurrency] = useState<string>("USD");
   //category field
   const [name, setName] = useState("");
-  async function fetchTransactions() {
-    const response = await fetch(
-      `http://localhost:8000/transactions/?user_id=${user?.id}&base_currency=${baseCurrency}`,
-      { method: "GET" },
-    );
-    const data = await response.json();
-    data.sort(
-      (a: any, b: any) =>
-        new Date(b.date).getTime() - new Date(a.date).getTime(),
-    );
-    setTransactions(applySort(data, sortBy));
-  }
+  const fetchTransactions = useCallback(
+    async (sortDir: "newest" | "oldest" = "newest") => {
+      try {
+        const response = await apiFetch(
+          `http://localhost:8000/transactions/?base_currency=${baseCurrency}&sort=${sortDir}`,
+          { method: "GET" },
+        );
+        const data = await response.json();
+        setTransactions(data);
+      } catch (err: any) {
+        setError(err.message);
+      }
+    },
+    [user?.id, baseCurrency],
+  );
 
-  async function fetchCategories() {
-    const response = await fetch(
-      `http://localhost:8000/categories/?user_id=${user?.id}`,
-      { method: "GET" },
-    );
-    const data = await response.json();
-    setCategories(data);
-  }
+  const fetchCategories = useCallback(async () => {
+    try {
+      const response = await apiFetch(
+        `http://localhost:8000/categories/`,
+        { method: "GET" },
+      );
+      const data = await response.json();
+      setCategories(data);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     async function init() {
-      const response = await fetch(
-        `http://localhost:8000/settings/?user_id=${user?.id}`,
-      );
-      const data = await response.json();
-      setBaseCurrency(data.base_currency);
+      try {
+        const currency = await fetchBaseCurrency();
+        setBaseCurrency(currency);
 
-      // use data.base_currency directly here, not the state variable
-      const transResponse = await fetch(
-        `http://localhost:8000/transactions/?user_id=${user?.id}&base_currency=${data.base_currency}`,
-      );
-      const transData = await transResponse.json();
-      transData.sort(
-        (a: any, b: any) =>
-          new Date(b.date).getTime() - new Date(a.date).getTime(),
-      );
-      setTransactions(transData);
+        // Backend orders by created_at desc by default
+        const transResponse = await apiFetch(
+          `http://localhost:8000/transactions/?base_currency=${currency}&sort=newest`,
+        );
+        const transData = await transResponse.json();
+        setTransactions(transData);
 
-      fetchCategories();
+        fetchCategories();
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     }
     init();
-  }, []);
+  }, [user?.id, fetchCategories]);
 
-  // Re-sort when sortBy changes
+  // Re-sort when sortBy changes — refetch from backend for date sorts,
+  // sort client-side for amount/category. Skip on first render (init handles it).
+  const initialSortMount = useRef(true);
   useEffect(() => {
-    setTransactions((prev) => applySort(prev, sortBy));
-  }, [sortBy]);
-
-  async function handleSubmit() {
-    if (Number(amount) < 0) {
-      toast.error("Please enter a valid amount");
+    if (initialSortMount.current) {
+      initialSortMount.current = false;
       return;
     }
+    if (sortBy === "newest" || sortBy === "oldest") {
+      fetchTransactions(sortBy);
+    } else {
+      setTransactions((prev) => applySort([...prev], sortBy));
+    }
+  }, [sortBy, fetchTransactions]);
+
+  async function handleSubmit() {
+    // Inline validation
+    const errs: FieldErrors = {};
+    const amt = Number(amount);
+    if (!amount || isNaN(amt) || amt <= 0) {
+      errs.amount = "Enter a positive amount";
+    }
+    if (!category) {
+      errs.category = "Select a category";
+    }
+    // Default date to today if not provided
+    let effectiveDate = date;
+    if (!effectiveDate) {
+      effectiveDate = new Date().toISOString().split("T")[0];
+      setDate(effectiveDate);
+    }
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
     setSubmitting(true);
     try {
       if (editId == null) {
-        await fetch(`http://localhost:8000/transactions/`, {
+        await apiFetch(`http://localhost:8000/transactions/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             user_id: user?.id,
-            amount: parseFloat(amount),
+            amount: amt,
             type,
             category,
             note,
-            date,
+            date: effectiveDate,
             is_recurring,
             recurring_interval,
             currency: baseCurrency,
@@ -138,18 +178,18 @@ function Transactions() {
         });
         toast.success("Transaction added");
       } else {
-        await fetch(
-          `http://localhost:8000/transactions/${editId}?user_id=${user?.id}`,
+        await apiFetch(
+          `http://localhost:8000/transactions/${editId}`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               user_id: user?.id,
-              amount: parseFloat(amount),
+              amount: amt,
               type,
               category,
               note,
-              date,
+              date: effectiveDate,
             }),
           },
         );
@@ -163,17 +203,24 @@ function Transactions() {
       setNote("");
       setDate("");
       setIsRecurring(false);
+      setFieldErrors({});
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setSubmitting(false);
     }
   }
 
   async function handleDelete(id) {
-    await fetch(
-      `http://localhost:8000/transactions/${id}?user_id=${user?.id}`,
-      { method: "DELETE" },
-    );
-    fetchTransactions();
+    try {
+      await apiFetch(
+        `http://localhost:8000/transactions/${id}`,
+        { method: "DELETE" },
+      );
+      fetchTransactions();
+    } catch (err: any) {
+      setError(err.message);
+    }
   }
 
   async function handleEdit(transaction) {
@@ -201,7 +248,7 @@ function Transactions() {
     }
     setSubmittingCategory(true);
     try {
-      await fetch(`http://localhost:8000/categories/`, {
+      await apiFetch(`http://localhost:8000/categories/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -212,6 +259,8 @@ function Transactions() {
       toast.success("Category added");
       fetchCategories();
       setName("");
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setSubmittingCategory(false);
     }
@@ -220,15 +269,16 @@ function Transactions() {
     const cat = categories.find((c) => c.id === category_id);
     if (!cat) return;
 
-    const relatedTx = transactions.filter((t) => t.category === cat.name);
+    try {
+      const relatedTx = transactions.filter((t) => t.category === cat.name);
 
-    const budgetsRes = await fetch(
-      `http://localhost:8000/budgets/?user_id=${user?.id}&base_currency=${baseCurrency}`,
-    );
-    const budgetsData = await budgetsRes.json();
-    const relatedBudgets = budgetsData.filter(
-      (b: any) => b.category === cat.name,
-    );
+      const budgetsRes = await apiFetch(
+        `http://localhost:8000/budgets/?base_currency=${baseCurrency}`,
+      );
+      const budgetsData = await budgetsRes.json();
+      const relatedBudgets = budgetsData.filter(
+        (b: any) => b.category === cat.name,
+      );
 
     const txCount = relatedTx.length;
     const budgetCount = relatedBudgets.length;
@@ -247,29 +297,58 @@ function Transactions() {
       // Cascade delete related transactions and budgets
       await Promise.all([
         ...relatedTx.map((t) =>
-          fetch(
-            `http://localhost:8000/transactions/${t.id}?user_id=${user?.id}`,
+          apiFetch(
+            `http://localhost:8000/transactions/${t.id}`,
             { method: "DELETE" },
           ),
         ),
         ...relatedBudgets.map((b: any) =>
-          fetch(`http://localhost:8000/budgets/${b.id}?user_id=${user?.id}`, {
-            method: "DELETE",
-          }),
+          apiFetch(
+            `http://localhost:8000/budgets/${b.id}`,
+            { method: "DELETE" },
+          ),
         ),
       ]);
     }
 
-    await fetch(
-      `http://localhost:8000/categories/${category_id}?user_id=${user?.id}`,
-      { method: "DELETE" },
-    );
-    toast.success(`Category "${cat.name}" deleted`);
-    fetchCategories();
-    fetchTransactions();
+      await apiFetch(
+        `http://localhost:8000/categories/${category_id}`,
+        { method: "DELETE" },
+      );
+      toast.success(`Category "${cat.name}" deleted`);
+      fetchCategories();
+      fetchTransactions();
+    } catch (err: any) {
+      setError(err.message);
+    }
   }
   const inputClass =
     "border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#666] bg-white dark:bg-[#0f0f0f] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/40 focus:border-emerald-500 dark:focus:border-[#e8643a]";
+
+  if (loading) {
+    return (
+      <div className="font-[Inter] animate-pulse">
+        <div className="mb-6 lg:mb-8">
+          <div className="h-8 w-40 bg-gray-200 dark:bg-[#222] rounded mb-2" />
+          <div className="h-4 w-56 bg-gray-200 dark:bg-[#222] rounded" />
+        </div>
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-40" />
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-32" />
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm h-64" />
+      </div>
+    );
+  }
+
+  const displayedTransactions = transactions.filter((t) => {
+    if (typeFilter !== "all" && t.type !== typeFilter) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const inNote = (t.note ?? "").toLowerCase().includes(q);
+      const inCategory = (t.category ?? "").toLowerCase().includes(q);
+      if (!inNote && !inCategory) return false;
+    }
+    return true;
+  });
 
   return (
     <div className="font-[Inter]">
@@ -283,6 +362,8 @@ function Transactions() {
         </p>
       </header>
 
+      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+
       {/* Add / Update Transaction */}
       <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-4 lg:p-6 mb-6">
         <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
@@ -290,13 +371,24 @@ function Transactions() {
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
-          <input
-            type="number"
-            placeholder="Amount"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className={inputClass}
-          />
+          <div>
+            <input
+              type="number"
+              placeholder="Amount"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className={`${inputClass} w-full ${
+                fieldErrors.amount
+                  ? "border-red-500 dark:border-red-500"
+                  : ""
+              }`}
+            />
+            {fieldErrors.amount && (
+              <p className="text-xs text-red-500 dark:text-red-400 mt-1">
+                {fieldErrors.amount}
+              </p>
+            )}
+          </div>
           <select
             value={type}
             onChange={(e) => setType(e.target.value)}
@@ -305,18 +397,29 @@ function Transactions() {
             <option value="expense">Expense</option>
             <option value="income">Income</option>
           </select>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">Select category</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.name}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
+          <div>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className={`${inputClass} w-full ${
+                fieldErrors.category
+                  ? "border-red-500 dark:border-red-500"
+                  : ""
+              }`}
+            >
+              <option value="">Select category</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.name}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+            {fieldErrors.category && (
+              <p className="text-xs text-red-500 dark:text-red-400 mt-1">
+                {fieldErrors.category}
+              </p>
+            )}
+          </div>
           <input
             type="date"
             value={date}
@@ -436,30 +539,64 @@ function Transactions() {
         )}
       </section>
 
-      {/* Sort control */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-white">
-          All Transactions
-        </h2>
-        <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-[#a0a0a0]">
-          Sort by
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortKey)}
-            className={inputClass}
-          >
-            <option value="date-newest">Date (Newest)</option>
-            <option value="date-oldest">Date (Oldest)</option>
-            <option value="amount-high">Amount (High to Low)</option>
-            <option value="amount-low">Amount (Low to High)</option>
-            <option value="category-az">Category (A-Z)</option>
-          </select>
-        </label>
+      {/* Search + filter + sort */}
+      <h2 className="text-sm font-semibold text-gray-700 dark:text-white mb-3">
+        All Transactions
+      </h2>
+      <div className="flex flex-col gap-2 mb-3">
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#666]" />
+          <input
+            type="search"
+            placeholder="Search by note or category..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className={`${inputClass} pl-9 w-full`}
+          />
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="flex gap-1">
+            {(
+              [
+                ["all", "All"],
+                ["income", "Income"],
+                ["expense", "Expense"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setTypeFilter(key)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  typeFilter === key
+                    ? "bg-emerald-500 dark:bg-[#e8643a] text-white"
+                    : "bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] text-gray-600 dark:text-[#a0a0a0] hover:bg-gray-50 dark:hover:bg-[#222]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-[#a0a0a0]">
+            Sort by
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortKey)}
+              className={inputClass}
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="amount-high">Amount High to Low</option>
+              <option value="amount-low">Amount Low to High</option>
+              <option value="category-az">Category A-Z</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       {/* Transactions table */}
       <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm overflow-hidden">
-        {transactions.length > 0 ? (
+        {displayedTransactions.length > 0 ? (
           <div className="overflow-auto max-h-[260px] thin-scrollbar">
             <table className="w-full text-sm min-w-[640px]">
             <thead className="sticky top-0 z-10">
@@ -485,13 +622,13 @@ function Transactions() {
               </tr>
             </thead>
             <tbody>
-              {transactions.map((t) => (
+              {displayedTransactions.map((t) => (
                 <tr
                   key={t.id}
                   className="border-b border-gray-100 dark:border-[#222] last:border-b-0 hover:bg-gray-50 dark:hover:bg-[#222] transition-colors"
                 >
-                  <td className="px-4 py-3 text-gray-700 dark:text-[#e0e0e0]">
-                    {t.date?.split("T")[0]}
+                  <td className="px-4 py-3 text-gray-700 dark:text-[#e0e0e0] whitespace-nowrap">
+                    {formatDate(t.created_at)}
                   </td>
                   <td className="px-4 py-3 text-gray-700 dark:text-[#e0e0e0]">
                     <span className="inline-flex items-center gap-2">
@@ -558,7 +695,9 @@ function Transactions() {
         ) : (
           <div className="p-12 text-center">
             <p className="text-sm text-gray-500 dark:text-[#a0a0a0]">
-              No transactions yet — add your first one above.
+              {transactions.length === 0
+                ? "No transactions yet — add your first one above."
+                : "No transactions match your search or filter."}
             </p>
           </div>
         )}

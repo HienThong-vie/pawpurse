@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { TrendingUp, TrendingDown, Wallet } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { formatCurrency } from "../lib/utils";
+import { formatCurrency, fetchBaseCurrency } from "../lib/utils";
+import { apiFetch } from "../lib/api";
+import ErrorBanner from "../components/ErrorBanner";
 
 function Dashboard() {
   const { user } = useAuth();
@@ -15,46 +17,55 @@ function Dashboard() {
   const [budgets, setBudgets] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [baseCurrency, setBaseCurrency] = useState<string>("USD");
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     async function init() {
-      // fetch settings first and get value directly
-      const settingsRes = await fetch(
-        `http://localhost:8000/settings/?user_id=${user?.id}`,
-      );
-      const settingsData = await settingsRes.json();
-      setBaseCurrency(settingsData.base_currency);
+      try {
+        const currency = await fetchBaseCurrency();
+        setBaseCurrency(currency);
 
-      // use settingsData.base_currency directly, NOT baseCurrency state
-      const analysisRes = await fetch(
-        `http://localhost:8000/analysis/?user_id=${user?.id}&base_currency=${settingsData.base_currency}`,
-      );
-      const analysisData = await analysisRes.json();
-      const transRes = await fetch(
-        `http://localhost:8000/transactions/?user_id=${user?.id}&base_currency=${settingsData.base_currency}`,
-      );
-      const transData = await transRes.json();
-      const budgetsRes = await fetch(
-        `http://localhost:8000/budgets/?user_id=${user?.id}&base_currency=${settingsData.base_currency}`,
-      );
-      const budgetsData = await budgetsRes.json();
-      setTransactions(transData);
-      setAnalysis(analysisData);
-      setBudgets(budgetsData);
-      setLoading(false);
+        // use currency directly in URLs, NOT baseCurrency state
+        const analysisRes = await apiFetch(
+          `http://localhost:8000/analysis/?base_currency=${currency}`,
+        );
+        const analysisData = await analysisRes.json();
+        const transRes = await apiFetch(
+          `http://localhost:8000/transactions/?base_currency=${currency}`,
+        );
+        const transData = await transRes.json();
+        const budgetsRes = await apiFetch(
+          `http://localhost:8000/budgets/?base_currency=${currency}`,
+        );
+        const budgetsData = await budgetsRes.json();
+        setTransactions(transData);
+        setAnalysis(analysisData);
+        setBudgets(budgetsData);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     }
     init();
   }, []);
-  let totalIncome = 0;
-  let totalExpense = 0;
-  transactions.forEach((transaction) => {
-    if (transaction.type == "income") {
-      totalIncome += transaction.amount;
-    } else if (transaction.type == "expense") {
-      totalExpense += transaction.amount;
-    }
-  });
-
-  const balance = totalIncome - totalExpense;
+  const totalIncome = useMemo(
+    () =>
+      transactions
+        .filter((t) => t.type === "income")
+        .reduce((sum, t) => sum + t.amount, 0),
+    [transactions],
+  );
+  const totalExpense = useMemo(
+    () =>
+      transactions
+        .filter((t) => t.type === "expense")
+        .reduce((sum, t) => sum + t.amount, 0),
+    [transactions],
+  );
+  const balance = useMemo(
+    () => totalIncome - totalExpense,
+    [totalIncome, totalExpense],
+  );
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -107,9 +118,58 @@ function Dashboard() {
 
   if (loading) {
     return (
-      <p className="font-[Inter] text-gray-500 dark:text-[#a0a0a0]">
-        loading...
-      </p>
+      <div className="font-[Inter] animate-pulse">
+        {/* Header */}
+        <div className="mb-6 lg:mb-8">
+          <div className="h-8 w-32 bg-gray-200 dark:bg-[#222] rounded mb-2" />
+          <div className="h-4 w-48 bg-gray-200 dark:bg-[#222] rounded" />
+        </div>
+
+        {/* Summary cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 mb-6 lg:mb-8">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="h-4 w-24 bg-gray-200 dark:bg-[#222] rounded" />
+                <div className="w-10 h-10 rounded-lg bg-gray-200 dark:bg-[#222]" />
+              </div>
+              <div className="h-8 w-32 bg-gray-200 dark:bg-[#222] rounded" />
+            </div>
+          ))}
+        </div>
+
+        {/* Two column layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
+          <div className="lg:col-span-2 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6">
+            <div className="h-5 w-40 bg-gray-200 dark:bg-[#222] rounded mb-5" />
+            <div className="flex flex-col gap-4">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i}>
+                  <div className="flex justify-between mb-1.5">
+                    <div className="h-4 w-24 bg-gray-200 dark:bg-[#222] rounded" />
+                    <div className="h-4 w-16 bg-gray-200 dark:bg-[#222] rounded" />
+                  </div>
+                  <div className="h-1.5 w-full bg-gray-200 dark:bg-[#222] rounded-full" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6">
+            <div className="h-5 w-32 bg-gray-200 dark:bg-[#222] rounded mb-5" />
+            <div className="flex flex-col gap-3">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="h-12 bg-gray-100 dark:bg-[#222] rounded-lg"
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -124,6 +184,8 @@ function Dashboard() {
           {today}
         </p>
       </header>
+
+      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 mb-6 lg:mb-8">

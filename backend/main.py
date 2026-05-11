@@ -1,0 +1,38 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from core.database import (
+    Base,
+    engine,
+)
+from routers import transactions,budgets,categories,analysis,goals,settings,export,currency
+from core.auth import fetch_jwks
+
+app = FastAPI()
+origins = [
+    "http://localhost:5173",
+    "http://localhost:5174" #frontend url
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins, #allow frontend url
+    allow_credentials=True, #allow cookies/auth
+    allow_methods=["*"], #allow all HTTP methods (GET,POST,ect)
+    allow_headers=["*"], #allow all headers
+)
+@app.on_event("startup")
+async def startup_event():
+    await fetch_jwks()
+    
+app.include_router(transactions.router)
+app.include_router(budgets.router)
+app.include_router(categories.router)
+app.include_router(analysis.router)
+app.include_router(goals.router)
+app.include_router(settings.router)
+app.include_router(export.router)
+app.include_router(currency.router)
+Base.metadata.create_all(bind=engine) #create all database tables on startup
+@app.get("/") #when frontend send GET request to backend then the function below will be executed automatically
+def get_message():
+    return {"message": "Smart Finance Tracker API is running"}

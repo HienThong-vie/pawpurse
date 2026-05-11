@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { BarChart2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { formatCurrency } from "../lib/utils";
+import { formatCurrency, fetchBaseCurrency } from "../lib/utils";
+import { apiFetch } from "../lib/api";
+import ErrorBanner from "../components/ErrorBanner";
 import {
   PieChart,
   Pie,
@@ -27,26 +29,29 @@ function Charts() {
   const [loading, setLoading] = useState<boolean>(true);
   const [baseCurrency, setBaseCurrency] = useState<string>("USD");
   const [timeFilter, setTimeFilter] = useState<"week" | "month" | "all">("all");
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     async function init() {
-      const response = await fetch(
-        `http://localhost:8000/settings/?user_id=${user?.id}`,
-      );
-      const data = await response.json();
-      setBaseCurrency(data.base_currency);
+      try {
+        const currency = await fetchBaseCurrency();
+        setBaseCurrency(currency);
 
-      // use data.base_currency directly here, not the state variable
-      const transResponse = await fetch(
-        `http://localhost:8000/transactions/?user_id=${user?.id}&base_currency=${data.base_currency}`,
-      );
-      const analysisResponse = await fetch(
-        `http://localhost:8000/analysis/?user_id=${user?.id}&base_currency=${data.base_currency}`,
-      );
-      const transRes = await transResponse.json();
-      const analysisRes = await analysisResponse.json();
-      setTransactions(transRes);
-      setAnalysis(analysisRes);
-      setLoading(false);
+        // use currency directly in URLs, NOT baseCurrency state
+        const transResponse = await apiFetch(
+          `http://localhost:8000/transactions/?base_currency=${currency}`,
+        );
+        const analysisResponse = await apiFetch(
+          `http://localhost:8000/analysis/?base_currency=${currency}`,
+        );
+        const transRes = await transResponse.json();
+        const analysisRes = await analysisResponse.json();
+        setTransactions(transRes);
+        setAnalysis(analysisRes);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     }
     init();
   }, []);
@@ -141,9 +146,41 @@ function Charts() {
 
   if (loading) {
     return (
-      <p className="font-[Inter] text-gray-500 dark:text-[#a0a0a0]">
-        Loading...
-      </p>
+      <div className="font-[Inter] animate-pulse">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="h-8 w-24 bg-gray-200 dark:bg-[#222] rounded mb-2" />
+          <div className="h-4 w-56 bg-gray-200 dark:bg-[#222] rounded" />
+        </div>
+
+        {/* Time filter */}
+        <div className="flex gap-2 mb-6">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-8 w-24 bg-gray-200 dark:bg-[#222] rounded-lg"
+            />
+          ))}
+        </div>
+
+        {/* Two-column grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6">
+          <div className="lg:col-span-3 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6">
+            <div className="h-5 w-40 bg-gray-200 dark:bg-[#222] rounded mb-2" />
+            <div className="h-4 w-64 bg-gray-200 dark:bg-[#222] rounded mb-6" />
+            <div className="h-72 bg-gray-100 dark:bg-[#222] rounded-lg" />
+          </div>
+          <div className="lg:col-span-2 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6">
+            <div className="h-5 w-44 bg-gray-200 dark:bg-[#222] rounded mb-2" />
+            <div className="h-4 w-32 bg-gray-200 dark:bg-[#222] rounded mb-6" />
+            <div className="flex flex-col items-center gap-4">
+              <div className="h-3 w-20 bg-gray-200 dark:bg-[#222] rounded" />
+              <div className="h-8 w-32 bg-gray-200 dark:bg-[#222] rounded" />
+              <div className="w-44 h-44 rounded-full bg-gray-200 dark:bg-[#222]" />
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -158,6 +195,8 @@ function Charts() {
           Visualize your financial data
         </p>
       </header>
+
+      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {/* Time filter */}
       <div className="flex gap-2 mb-6">

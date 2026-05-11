@@ -1,8 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Pencil, Trash2, Plus, Target, Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import { formatCurrency } from "../lib/utils";
+import { formatCurrency, fetchBaseCurrency } from "../lib/utils";
+import { apiFetch } from "../lib/api";
+import ErrorBanner from "../components/ErrorBanner";
+
+type GoalFieldErrors = {
+  name?: string;
+  target_amount?: string;
+  deadline?: string;
+};
 
 function Goals() {
   const { user } = useAuth();
@@ -20,31 +28,48 @@ function Goals() {
   const [progressSubmittingId, setProgressSubmittingId] = useState<
     number | null
   >(null);
-  async function initPage() {
-    const response = await fetch(
-      `http://localhost:8000/settings/?user_id=${user?.id}`,
-    );
-    const data = await response.json();
-    setBaseCurrency(data.base_currency);
+  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<GoalFieldErrors>({});
+  const [loading, setLoading] = useState(true);
+  const initPage = useCallback(async () => {
+    try {
+      const currency = await fetchBaseCurrency();
+      setBaseCurrency(currency);
 
-    const goalsResponse = await fetch(
-      `http://localhost:8000/goals/?user_id=${user?.id}&base_currency=${data.base_currency}`,
-    );
-    const goalsData = await goalsResponse.json();
-    setGoals(goalsData);
-  }
+      const goalsResponse = await apiFetch(
+        `http://localhost:8000/goals/?base_currency=${currency}`,
+      );
+      const goalsData = await goalsResponse.json();
+      setGoals(goalsData);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
   useEffect(() => {
     initPage();
-  }, []);
+  }, [initPage]);
   async function handleSubmit() {
-    if (!name.trim() || !target_amount) {
-      toast.error("Please fill in name and target amount");
-      return;
+    // Inline validation
+    const errs: GoalFieldErrors = {};
+    if (!name.trim()) errs.name = "Name is required";
+    const target = Number(target_amount);
+    if (!target_amount || isNaN(target) || target <= 0)
+      errs.target_amount = "Enter a positive target";
+    if (deadline) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const d = new Date(deadline);
+      if (d < today) errs.deadline = "Deadline must be a future date";
     }
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
     setSubmitting(true);
     try {
       if (editId == null) {
-        await fetch(`http://localhost:8000/goals/`, {
+        await apiFetch(`http://localhost:8000/goals/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -53,12 +78,13 @@ function Goals() {
             target_amount: parseFloat(target_amount),
             current_amount: parseFloat(current_amount) || 0,
             deadline: deadline || null,
+            currency: baseCurrency,
           }),
         });
         toast.success("Goal added");
       } else {
-        await fetch(
-          `http://localhost:8000/goals/${editId}?user_id=${user?.id}`,
+        await apiFetch(
+          `http://localhost:8000/goals/${editId}`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -68,6 +94,7 @@ function Goals() {
               target_amount: parseFloat(target_amount),
               current_amount: parseFloat(current_amount) || 0,
               deadline: deadline || null,
+              currency: baseCurrency,
             }),
           },
         );
@@ -79,6 +106,9 @@ function Goals() {
       setTargetAmount("");
       setCurrentAmount("");
       setDeadline("");
+      setFieldErrors({});
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setSubmitting(false);
     }
@@ -98,11 +128,14 @@ function Goals() {
     setDeadline("");
   }
   async function handleDelete(id) {
-    const response = await fetch(
-      `http://localhost:8000/goals/${id}?user_id=${user?.id}`,
-      { method: "DELETE" },
-    );
-    initPage();
+    try {
+      await apiFetch(`http://localhost:8000/goals/${id}`, {
+        method: "DELETE",
+      });
+      initPage();
+    } catch (err: any) {
+      setError(err.message);
+    }
   }
   async function handleAddProgress(goal) {
     const added = parseFloat(progressInput[goal.id] || "0");
@@ -110,20 +143,49 @@ function Goals() {
       toast.error("Enter an amount greater than zero");
       return;
     }
-    const newAmount = Number(goal.current_amount) + added;
     setProgressSubmittingId(goal.id);
     try {
-      await fetch(
-        `http://localhost:8000/goals/${goal.id}?user_id=${user?.id}`,
+      const goalCurrency = goal.currency || "USD";
+      // current_amount the frontend sees is already converted to baseCurrency.
+      // We need to send the new STORED value (in goalCurrency) back.
+      let newStored: number;
+      if (goalCurrency === baseCurrency) {
+        newStored = Number(goal.current_amount || 0) + added;
+      } else {
+        const ratesRes = await apiFetch(
+          `http://localhost:8000/currency/rates?base=${baseCurrency}`,
+        );
+        const ratesData = await ratesRes.json();
+        const rates = ratesData.rates || {};
+        const baseRate = rates[baseCurrency];
+        const goalRate = rates[goalCurrency];
+        if (!baseRate || !goalRate) {
+          // Rates unavailable — fall back to plain addition (no conversion)
+          newStored = Number(goal.current_amount || 0) + added;
+        } else {
+          // Convert displayed total back to goal's stored currency:
+          //   stored = displayed / rates[base] * rates[goal]
+          newStored =
+            (((Number(goal.current_amount) || 0) + added) / baseRate) *
+            goalRate;
+        }
+      }
+
+      await apiFetch(
+        `http://localhost:8000/goals/${goal.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ current_amount: newAmount }),
+          body: JSON.stringify({ current_amount: newStored }),
         },
       );
-      toast.success(`Added ${formatCurrency(added, baseCurrency)} to ${goal.name}`);
+      toast.success(
+        `Added ${formatCurrency(added, baseCurrency)} to ${goal.name}`,
+      );
       initPage();
       setProgressInput({ ...progressInput, [goal.id]: "" });
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setProgressSubmittingId(null);
     }
@@ -131,6 +193,26 @@ function Goals() {
 
   const inputClass =
     "border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#666] bg-white dark:bg-[#0f0f0f] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/40 focus:border-emerald-500 dark:focus:border-[#e8643a]";
+
+  if (loading) {
+    return (
+      <div className="font-[Inter] animate-pulse">
+        <div className="mb-6 lg:mb-8">
+          <div className="h-8 w-24 bg-gray-200 dark:bg-[#222] rounded mb-2" />
+          <div className="h-4 w-44 bg-gray-200 dark:bg-[#222] rounded" />
+        </div>
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-32" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-5 h-44"
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="font-[Inter]">
@@ -144,32 +226,65 @@ function Goals() {
         </p>
       </header>
 
+      {error && (
+        <ErrorBanner message={error} onDismiss={() => setError(null)} />
+      )}
+
       {/* Add / Update Goal */}
       <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-4 lg:p-6 mb-6">
         <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
           {editId ? "Update Goal" : "Add Goal"}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_auto] gap-3">
-          <input
-            type="text"
-            placeholder="Goal name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className={inputClass}
-          />
-          <input
-            type="number"
-            placeholder="Target amount"
-            value={target_amount}
-            onChange={(e) => setTargetAmount(e.target.value)}
-            className={inputClass}
-          />
-          <input
-            type="date"
-            value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
-            className={inputClass}
-          />
+          <div>
+            <input
+              type="text"
+              placeholder="Goal name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={`${inputClass} w-full ${
+                fieldErrors.name ? "border-red-500 dark:border-red-500" : ""
+              }`}
+            />
+            {fieldErrors.name && (
+              <p className="text-xs text-red-500 dark:text-red-400 mt-1">
+                {fieldErrors.name}
+              </p>
+            )}
+          </div>
+          <div>
+            <input
+              type="number"
+              placeholder="Target amount"
+              value={target_amount}
+              onChange={(e) => setTargetAmount(e.target.value)}
+              className={`${inputClass} w-full ${
+                fieldErrors.target_amount
+                  ? "border-red-500 dark:border-red-500"
+                  : ""
+              }`}
+            />
+            {fieldErrors.target_amount && (
+              <p className="text-xs text-red-500 dark:text-red-400 mt-1">
+                {fieldErrors.target_amount}
+              </p>
+            )}
+          </div>
+          <div>
+            <input
+              type="date"
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+              className={`${inputClass} w-full ${
+                fieldErrors.deadline ? "border-red-500 dark:border-red-500" : ""
+              }`}
+            />
+            {fieldErrors.deadline && (
+              <p className="text-xs text-red-500 dark:text-red-400 mt-1">
+                {fieldErrors.deadline}
+              </p>
+            )}
+          </div>
           <div className="flex gap-2">
             {editId !== null && (
               <button

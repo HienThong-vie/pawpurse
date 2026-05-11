@@ -1,8 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Pencil, Trash2, Wallet, Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import { formatCurrency } from "../lib/utils";
+import { formatCurrency, fetchBaseCurrency } from "../lib/utils";
+import { apiFetch } from "../lib/api";
+import ErrorBanner from "../components/ErrorBanner";
+
+type BudgetFieldErrors = {
+  category?: string;
+  limit?: string;
+  period?: string;
+};
 
 function Budget() {
   const { user } = useAuth();
@@ -17,65 +25,85 @@ function Budget() {
   const [period, setPeriod] = useState("");
   const [baseCurrency, setBaseCurrency] = useState<string>("USD");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<BudgetFieldErrors>({});
+  const [loading, setLoading] = useState(true);
 
-  async function fetchCategories() {
-    const response = await fetch(
-      `http://localhost:8000/categories/?user_id=${user?.id}`,
-      { method: "GET" },
-    );
-    const data = await response.json();
-    setCategories(data);
-  }
-  async function fetchBudgets() {
-    const response = await fetch(
-      `http://localhost:8000/budgets/?user_id=${user?.id}&base_currency=${baseCurrency}`,
-      { method: "GET" },
-    );
-    const data = await response.json();
-    setBudgets(data);
-  }
+  const fetchCategories = useCallback(async () => {
+    try {
+      const response = await apiFetch(
+        `http://localhost:8000/categories/`,
+        { method: "GET" },
+      );
+      const data = await response.json();
+      setCategories(data);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  }, [user?.id]);
+  const fetchBudgets = useCallback(async () => {
+    try {
+      const response = await apiFetch(
+        `http://localhost:8000/budgets/?base_currency=${baseCurrency}`,
+        { method: "GET" },
+      );
+      const data = await response.json();
+      setBudgets(data);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  }, [user?.id, baseCurrency]);
 
   useEffect(() => {
     async function init() {
-      const response = await fetch(
-        `http://localhost:8000/settings/?user_id=${user?.id}`,
-      );
-      const data = await response.json();
-      setBaseCurrency(data.base_currency);
+      try {
+        const currency = await fetchBaseCurrency();
+        setBaseCurrency(currency);
 
-      const budgetResponse = await fetch(
-        `http://localhost:8000/budgets/?user_id=${user?.id}&base_currency=${data.base_currency}`,
-      );
-      const budgetRes = await budgetResponse.json();
-      fetchCategories();
-      setBudgets(budgetRes);
+        const budgetResponse = await apiFetch(
+          `http://localhost:8000/budgets/?base_currency=${currency}`,
+        );
+        const budgetRes = await budgetResponse.json();
+        fetchCategories();
+        setBudgets(budgetRes);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     }
     init();
-  }, []);
+  }, [user?.id, fetchCategories]);
 
   async function handleSubmit() {
-    if (!category || !limit || !period) {
-      toast.error("Please fill in all fields");
-      return;
-    }
+    // Inline validation
+    const errs: BudgetFieldErrors = {};
+    if (!category) errs.category = "Select a category";
+    const lim = Number(limit);
+    if (!limit || isNaN(lim) || lim <= 0)
+      errs.limit = "Enter a positive limit";
+    if (!period) errs.period = "Select a period";
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
     setSubmitting(true);
     try {
       if (editId == null) {
-        await fetch(`http://localhost:8000/budgets/`, {
+        await apiFetch(`http://localhost:8000/budgets/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             user_id: user?.id,
             category,
-            limit: parseFloat(limit),
+            limit: lim,
             period,
             currency: baseCurrency,
           }),
         });
         toast.success("Budget added");
       } else {
-        await fetch(
-          `http://localhost:8000/budgets/${editId}?user_id=${user?.id}`,
+        await apiFetch(
+          `http://localhost:8000/budgets/${editId}`,
           {
             method: "PUT",
             headers: {
@@ -84,7 +112,7 @@ function Budget() {
             body: JSON.stringify({
               user_id: user?.id,
               category,
-              limit: parseFloat(limit),
+              limit: lim,
               period,
               currency: baseCurrency,
             }),
@@ -97,16 +125,23 @@ function Budget() {
       setLimit("");
       setPeriod("");
       setEditId(null);
+      setFieldErrors({});
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setSubmitting(false);
     }
   }
   async function handleDelete(budget_id) {
-    const response = await fetch(
-      `http://localhost:8000/budgets/${budget_id}?user_id=${user?.id}`,
-      { method: "DELETE" },
-    );
-    fetchBudgets();
+    try {
+      await apiFetch(
+        `http://localhost:8000/budgets/${budget_id}`,
+        { method: "DELETE" },
+      );
+      fetchBudgets();
+    } catch (err: any) {
+      setError(err.message);
+    }
   }
   async function handleEdit(budget) {
     setEditId(budget.id);
@@ -117,6 +152,26 @@ function Budget() {
 
   const inputClass =
     "border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#666] bg-white dark:bg-[#0f0f0f] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/40 focus:border-emerald-500 dark:focus:border-[#e8643a]";
+
+  if (loading) {
+    return (
+      <div className="font-[Inter] animate-pulse">
+        <div className="mb-6 lg:mb-8">
+          <div className="h-8 w-32 bg-gray-200 dark:bg-[#222] rounded mb-2" />
+          <div className="h-4 w-48 bg-gray-200 dark:bg-[#222] rounded" />
+        </div>
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-32" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-5 h-32"
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const statusBarColor: Record<string, string> = {
     acceptable: "bg-emerald-500",
@@ -137,40 +192,75 @@ function Budget() {
         </p>
       </header>
 
+      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+
       {/* Add / Update Budget */}
       <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-4 lg:p-6 mb-6">
         <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
           {editId ? "Update Budget" : "Add Budget"}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto] gap-3">
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">Select Category</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.name}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="number"
-            placeholder="Amount"
-            value={limit}
-            onChange={(e) => setLimit(e.target.value)}
-            className={inputClass}
-          />
-          <select
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">Select Period</option>
-            <option value="week">Week</option>
-            <option value="month">Month</option>
-          </select>
+          <div>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className={`${inputClass} w-full ${
+                fieldErrors.category
+                  ? "border-red-500 dark:border-red-500"
+                  : ""
+              }`}
+            >
+              <option value="">Select Category</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.name}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+            {fieldErrors.category && (
+              <p className="text-xs text-red-500 dark:text-red-400 mt-1">
+                {fieldErrors.category}
+              </p>
+            )}
+          </div>
+          <div>
+            <input
+              type="number"
+              placeholder="Amount"
+              value={limit}
+              onChange={(e) => setLimit(e.target.value)}
+              className={`${inputClass} w-full ${
+                fieldErrors.limit
+                  ? "border-red-500 dark:border-red-500"
+                  : ""
+              }`}
+            />
+            {fieldErrors.limit && (
+              <p className="text-xs text-red-500 dark:text-red-400 mt-1">
+                {fieldErrors.limit}
+              </p>
+            )}
+          </div>
+          <div>
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className={`${inputClass} w-full ${
+                fieldErrors.period
+                  ? "border-red-500 dark:border-red-500"
+                  : ""
+              }`}
+            >
+              <option value="">Select Period</option>
+              <option value="week">Week</option>
+              <option value="month">Month</option>
+            </select>
+            {fieldErrors.period && (
+              <p className="text-xs text-red-500 dark:text-red-400 mt-1">
+                {fieldErrors.period}
+              </p>
+            )}
+          </div>
           <button
             onClick={() => handleSubmit()}
             disabled={submitting}

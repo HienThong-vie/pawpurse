@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { Lightbulb, Sparkles, Bot, Send } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { apiFetch } from "../lib/api";
+import { fetchBaseCurrency } from "../lib/utils";
+import ErrorBanner from "../components/ErrorBanner";
 
 type Status = "exceeded" | "warning" | "caution" | "acceptable";
 
@@ -14,22 +17,26 @@ function Advisor() {
     advice: [],
   });
   const [baseCurrency, setBaseCurrency] = useState<string>("USD");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function init() {
-      // fetch settings first and get value directly
-      const settingsRes = await fetch(
-        `http://localhost:8000/settings/?user_id=${user?.id}`,
-      );
-      const settingsData = await settingsRes.json();
-      setBaseCurrency(settingsData.base_currency);
+      try {
+        const currency = await fetchBaseCurrency();
+        setBaseCurrency(currency);
 
-      // use settingsData.base_currency directly, NOT baseCurrency state
-      const analysisRes = await fetch(
-        `http://localhost:8000/analysis/?user_id=${user?.id}&base_currency=${settingsData.base_currency}`,
-      );
-      const analysisData = await analysisRes.json();
-      setAnalysis(analysisData);
+        // use currency directly in URLs, NOT baseCurrency state
+        const analysisRes = await apiFetch(
+          `http://localhost:8000/analysis/?base_currency=${currency}`,
+        );
+        const analysisData = await analysisRes.json();
+        setAnalysis(analysisData);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     }
     init();
   }, []);
@@ -43,10 +50,6 @@ function Advisor() {
     if (msg.includes("🟠")) return "warning";
     if (msg.includes("🟡")) return "caution";
     return "acceptable";
-  }
-
-  function stripEmoji(msg: string): string {
-    return msg.replace(/^[🔴🟠🟡🟢]\s*/, "");
   }
 
   const statusBorder: Record<Status, string> = {
@@ -84,6 +87,30 @@ function Advisor() {
     (analysis.budget_analysis && analysis.budget_analysis.length > 0) ||
     (analysis.advice && analysis.advice.length > 0);
 
+  if (loading) {
+    return (
+      <div className="font-[Inter] animate-pulse">
+        <div className="mb-6 lg:mb-8">
+          <div className="h-8 w-48 bg-gray-200 dark:bg-[#222] rounded mb-2" />
+          <div className="h-4 w-56 bg-gray-200 dark:bg-[#222] rounded" />
+        </div>
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-72" />
+        <div className="flex gap-2 mb-6">
+          <div className="h-9 w-24 bg-gray-200 dark:bg-[#222] rounded-lg" />
+          <div className="h-9 w-32 bg-gray-200 dark:bg-[#222] rounded-lg" />
+        </div>
+        <div className="flex flex-col gap-3">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm h-16"
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="font-[Inter]">
       {/* Page header */}
@@ -95,6 +122,8 @@ function Advisor() {
           Personalized budget insights
         </p>
       </header>
+
+      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {/* AI Chat (coming soon) */}
       <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-4 lg:p-6 mb-6 lg:mb-8">
@@ -189,7 +218,7 @@ function Advisor() {
                 className={`flex items-center justify-between gap-4 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] border-l-4 ${statusBorder[status]} shadow-sm p-4`}
               >
                 <p className="text-sm text-gray-700 dark:text-[#e0e0e0] leading-relaxed">
-                  {stripEmoji(advice)}
+                  {advice}
                 </p>
                 <span
                   className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${statusBadge[status]}`}

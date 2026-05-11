@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Coins, Download, Sun, Moon, Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useToast } from "../context/ToastContext";
+import { apiFetch } from "../lib/api";
 
 function Settings() {
   const { user } = useAuth();
@@ -11,28 +12,25 @@ function Settings() {
   const [currency, setCurrency] = useState("");
   const [saving, setSaving] = useState(false);
 
-  async function fetchSettings() {
-    const response = await fetch(
-      `http://localhost:8000/settings/?user_id=${user?.id}`,
+  const fetchSettings = useCallback(async () => {
+    const response = await apiFetch(
+      `http://localhost:8000/settings/`,
     );
     const data = await response.json();
     setCurrency(data.base_currency);
-  }
+  }, [user?.id]);
 
   async function handleEditCurrency() {
     setSaving(true);
     try {
-      await fetch(
-        `http://localhost:8000/settings/?user_id=${user?.id}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            user_id: user?.id,
-            base_currency: currency,
-          }),
-        },
-      );
+      await apiFetch(`http://localhost:8000/settings/`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: user?.id,
+          base_currency: currency,
+        }),
+      });
       toast.success("Settings saved");
     } finally {
       setSaving(false);
@@ -40,8 +38,8 @@ function Settings() {
   }
 
   async function handleDownloadCSV() {
-    const response = await fetch(
-      `http://localhost:8000/export/csv?user_id=${user?.id}`,
+    const response = await apiFetch(
+      `http://localhost:8000/export/csv`,
       { method: "GET" },
     );
     const blob = await response.blob();
@@ -54,8 +52,8 @@ function Settings() {
   }
 
   async function handleDownloadPDF() {
-    const response = await fetch(
-      `http://localhost:8000/export/pdf?user_id=${user?.id}`,
+    const response = await apiFetch(
+      `http://localhost:8000/export/pdf`,
       { method: "GET" },
     );
     const blob = await response.blob();
@@ -69,7 +67,7 @@ function Settings() {
 
   useEffect(() => {
     fetchSettings();
-  }, []);
+  }, [fetchSettings]);
 
   const inputClass =
     "w-full border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white bg-white dark:bg-[#0f0f0f] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/40 focus:border-emerald-500 dark:focus:border-[#e8643a]";
@@ -98,21 +96,20 @@ function Settings() {
           <p className="text-sm text-gray-500 dark:text-[#a0a0a0] mb-4">
             Select your base currency for displaying all amounts
           </p>
-
-          <select
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
-            className={inputClass}
-          >
-            <option value="USD">USD</option>
-            <option value="EUR">EUR</option>
-            <option value="GBP">GBP</option>
-            <option value="JPY">JPY</option>
-            <option value="AUD">AUD</option>
-            <option value="VND">VND</option>
-          </select>
-
           <div className="flex items-center justify-end mt-4 gap-3">
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className={inputClass}
+            >
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+              <option value="JPY">JPY</option>
+              <option value="AUD">AUD</option>
+              <option value="VND">VND</option>
+            </select>
+
             <button
               onClick={(e) => handleEditCurrency()}
               disabled={saving}
