@@ -10,7 +10,7 @@ import PasswordStrength from "../components/auth/PasswordStrength";
 
 function ReassuranceCard() {
   return (
-    <div className="absolute right-8 top-1/2 -translate-y-1/2 w-64 animate-element animate-delay-500 flex items-start gap-3 rounded-2xl bg-white/40 dark:bg-white/[0.05] backdrop-blur-xl border border-white/20 p-4 text-sm text-white">
+    <div className="absolute right-8 top-1/2 -translate-y-1/2 w-64 animate-element animate-delay-500 flex items-start gap-3 rounded-2xl bg-white/70 dark:bg-white/[0.05] backdrop-blur-xl border border-white/20 p-4 text-sm text-white">
       <ShieldCheck className="w-5 h-5 shrink-0 mt-0.5" />
       <p>
         Pick a password you haven't used elsewhere. We'll log you in

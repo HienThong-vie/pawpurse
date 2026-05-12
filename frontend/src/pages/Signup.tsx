@@ -27,7 +27,7 @@ function FeatureCards() {
       {FEATURES.map((feature, i) => (
         <div
           key={feature}
-          className={`animate-element ${FEATURE_DELAYS[i]} flex items-center gap-3 rounded-2xl bg-white/40 dark:bg-white/[0.05] backdrop-blur-xl border border-white/20 p-4 text-sm text-white`}
+          className={`animate-element ${FEATURE_DELAYS[i]} flex items-center gap-3 rounded-2xl bg-white/70 dark:bg-white/[0.05] backdrop-blur-xl border border-white/20 p-4 text-sm text-white`}
         >
           <CheckCircle className="w-5 h-5 shrink-0" />
           <span className="font-medium">{feature}</span>
