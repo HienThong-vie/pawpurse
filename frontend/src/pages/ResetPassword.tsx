@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { Lock, Eye, EyeOff, ShieldCheck, Loader2 } from "lucide-react";
 import supabase from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext";
@@ -23,12 +23,16 @@ function ReassuranceCard() {
 function ResetPassword() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { setIsRecovering } = useAuth();
+  const { isRecovering, setIsRecovering } = useAuth();
   const [newPassword, setNewPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [showNewPw, setShowNewPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
+
+  if (!isRecovering) {
+    return <Navigate to="/" replace />;
+  }
 
   async function updatePassword() {
     if (!newPassword || !confirmPassword) {
