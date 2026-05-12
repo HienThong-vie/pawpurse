@@ -17,7 +17,7 @@ function AuthLayout({
   rightOverlay,
 }: AuthLayoutProps) {
   return (
-    <div className="flex flex-col md:flex-row min-h-screen font-[Inter] bg-white dark:bg-[#0f0f0f] text-gray-900 dark:text-white">
+    <div className="flex flex-col md:flex-row min-h-screen overflow-x-hidden font-[Inter] bg-white dark:bg-[#0f0f0f] text-gray-900 dark:text-white">
       {/* Left: form column */}
       <section className="flex-1 flex items-center justify-center p-6 md:p-12">
         <div className="w-full max-w-md">
