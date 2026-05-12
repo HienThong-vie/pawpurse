@@ -27,8 +27,10 @@ function ResetPassword() {
   const [newPassword, setNewPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [showNewPw, setShowNewPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
+  const busy = submitting || cancelling;
 
   if (!isRecovering) {
     return <Navigate to="/" replace />;
@@ -57,6 +59,20 @@ function ResetPassword() {
       }
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function cancelRecovery() {
+    setCancelling(true);
+    try {
+      // Signing out fires SIGNED_OUT, which clears isRecovering in AuthContext.
+      // The page's gate (above) then redirects to / → /login on next render.
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        toast.error(error.message);
+      }
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -116,12 +132,23 @@ function ResetPassword() {
         />
         <button
           onClick={updatePassword}
-          disabled={submitting}
+          disabled={busy}
           className="w-full rounded-2xl bg-emerald-500 dark:bg-[#e8643a] text-white py-4 text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
           {submitting ? "Updating..." : "Update password"}
         </button>
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={cancelRecovery}
+            disabled={busy}
+            className="text-sm text-gray-500 dark:text-[#a0a0a0] hover:text-gray-700 dark:hover:text-white hover:underline transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {cancelling && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {cancelling ? "Signing out..." : "Cancel and sign out"}
+          </button>
+        </div>
       </div>
     </AuthLayout>
   );
