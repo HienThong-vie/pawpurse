@@ -1,8 +1,53 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { CheckCircle, Mail, Lock, Loader2 } from "lucide-react";
+import { CheckCircle, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import supabase from "../lib/supabaseClient";
 import { useToast } from "../context/ToastContext";
+import AuthLayout from "../components/auth/AuthLayout";
+import GlassInput from "../components/auth/GlassInput";
+
+type Mode = "login" | "forgot" | "forgot-sent";
+
+const FEATURES = [
+  "Track income and expenses",
+  "Set and monitor budgets",
+  "Visualize spending patterns",
+  "Set financial goals",
+];
+
+const FEATURE_DELAYS = [
+  "animate-delay-500",
+  "animate-delay-600",
+  "animate-delay-700",
+  "animate-delay-800",
+];
+
+function FeatureCards() {
+  return (
+    <div className="absolute right-8 top-1/2 -translate-y-1/2 flex flex-col gap-3 w-64">
+      {FEATURES.map((feature, i) => (
+        <div
+          key={feature}
+          className={`animate-element ${FEATURE_DELAYS[i]} flex items-center gap-3 rounded-2xl bg-white/40 dark:bg-white/[0.05] backdrop-blur-xl border border-white/20 p-4 text-sm text-white`}
+        >
+          <CheckCircle className="w-5 h-5 shrink-0" />
+          <span className="font-medium">{feature}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const TITLES: Record<Mode, string> = {
+  login: "Welcome back",
+  forgot: "Reset your password",
+  "forgot-sent": "Check your email",
+};
+const DESCRIPTIONS: Record<Mode, string> = {
+  login: "Sign in to your account",
+  forgot: "Enter your email and we'll send you a reset link.",
+  "forgot-sent": "Check your email for a reset link.",
+};
 
 function Login() {
   const navigate = useNavigate();
@@ -10,17 +55,20 @@ function Login() {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
-  //asign the async allow function to use await
+  const [mode, setMode] = useState<Mode>("login");
+  const [forgotSubmitting, setForgotSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
   async function Logging() {
     setSubmitting(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
-      }); // await till the supabase get user email and password, otherwise they are empty
+      });
       if (error) {
         toast.error(error.message);
-      } else if (!error) {
+      } else {
         navigate("/dashboard");
       }
     } finally {
@@ -28,101 +76,82 @@ function Login() {
     }
   }
 
-  const features = [
-    "Track income and expenses",
-    "Set and monitor budgets",
-    "Visualize spending patterns",
-    "Set financial goals",
-  ];
+  async function sendResetEmail() {
+    if (!email) {
+      toast.error("Please enter your email");
+      return;
+    }
+    setForgotSubmitting(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: "http://localhost:5173",
+      });
+      if (error) {
+        toast.error(error.message);
+      } else {
+        setMode("forgot-sent");
+      }
+    } finally {
+      setForgotSubmitting(false);
+    }
+  }
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen font-[Inter]">
-      {/* Left panel — compact strip on mobile, full panel on desktop */}
-      <div className="md:w-2/5 bg-emerald-500 text-white p-4 md:p-12 flex md:flex-col items-center md:items-stretch md:justify-between">
-        <div className="flex md:block items-center gap-2 w-full">
-          <div className="flex items-center gap-2 md:mb-12">
-            <span className="inline-block w-3 h-3 rounded-full bg-white" />
-            <span className="text-sm font-semibold tracking-wide">
-              SMART FINANCE TRACKER
-            </span>
-          </div>
-          <div className="hidden md:block">
-            <h1 className="text-4xl font-extrabold tracking-tight leading-tight mb-4">
-              Take control of your finances
-            </h1>
-            <p className="text-emerald-50 text-base mb-10">
-              Everything you need to track, plan, and grow your money — in one
-              clean dashboard.
-            </p>
-            <ul className="flex flex-col gap-3">
-              {features.map((feature) => (
-                <li key={feature} className="flex items-center gap-3 text-sm">
-                  <CheckCircle className="w-5 h-5 shrink-0 text-white" />
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-        <p className="hidden md:block text-xs text-emerald-100">
-          © {new Date().getFullYear()} Smart Finance Tracker
-        </p>
-      </div>
-
-      {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center bg-white dark:bg-[#0f0f0f] p-6 md:p-8">
-        <div className="w-full max-w-sm">
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-1">
-            Welcome back
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-[#a0a0a0] mb-8">
-            Sign in to your account
-          </p>
-
-          <div className="flex flex-col gap-4">
-            <label className="block">
-              <span className="text-sm font-medium text-gray-700 dark:text-[#e0e0e0] mb-1.5 block">
-                Email
-              </span>
-              <div className="relative">
-                <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#666]" />
-                <input
-                  type="text"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full border border-gray-200 dark:border-[#2a2a2a] rounded-lg pl-10 pr-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#666] bg-white dark:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/40 focus:border-emerald-500 dark:focus:border-[#e8643a]"
-                />
-              </div>
-            </label>
-
-            <label className="block">
-              <span className="text-sm font-medium text-gray-700 dark:text-[#e0e0e0] mb-1.5 block">
-                Password
-              </span>
-              <div className="relative">
-                <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#666]" />
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full border border-gray-200 dark:border-[#2a2a2a] rounded-lg pl-10 pr-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#666] bg-white dark:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/40 focus:border-emerald-500 dark:focus:border-[#e8643a]"
-                />
-              </div>
-            </label>
-
+    <AuthLayout
+      title={TITLES[mode]}
+      description={DESCRIPTIONS[mode]}
+      rightOverlay={<FeatureCards />}
+    >
+      {mode === "login" && (
+        <div className="space-y-5">
+          <GlassInput
+            label="Email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            leftIcon={<Mail className="w-4 h-4" />}
+          />
+          <GlassInput
+            label="Password"
+            type={showPassword ? "text" : "password"}
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            leftIcon={<Lock className="w-4 h-4" />}
+            rightSlot={
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="p-1 text-gray-400 dark:text-[#666] hover:text-gray-700 dark:hover:text-white transition-colors"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
+            }
+          />
+          <button
+            onClick={Logging}
+            disabled={submitting}
+            className="w-full rounded-2xl bg-emerald-500 dark:bg-[#e8643a] text-white py-4 text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+            {submitting ? "Signing in..." : "Sign in"}
+          </button>
+          <div className="flex justify-center">
             <button
-              onClick={() => Logging()}
-              disabled={submitting}
-              className="w-full mt-2 px-4 py-2.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              type="button"
+              onClick={() => setMode("forgot")}
+              className="text-sm font-semibold text-emerald-600 dark:text-[#e8643a] hover:underline"
             >
-              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              {submitting ? "Signing in..." : "Sign in"}
+              Forgot password?
             </button>
           </div>
-
-          <p className="text-sm text-gray-500 dark:text-[#a0a0a0] text-center mt-6">
+          <p className="text-sm text-gray-500 dark:text-[#a0a0a0] text-center">
             Don't have an account?{" "}
             <Link
               to="/signup"
@@ -132,8 +161,50 @@ function Login() {
             </Link>
           </p>
         </div>
-      </div>
-    </div>
+      )}
+
+      {mode === "forgot" && (
+        <div className="space-y-5">
+          <GlassInput
+            label="Email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            leftIcon={<Mail className="w-4 h-4" />}
+          />
+          <button
+            onClick={sendResetEmail}
+            disabled={forgotSubmitting}
+            className="w-full rounded-2xl bg-emerald-500 dark:bg-[#e8643a] text-white py-4 text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {forgotSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+            {forgotSubmitting ? "Sending..." : "Send reset link"}
+          </button>
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => setMode("login")}
+              className="text-sm font-semibold text-emerald-600 dark:text-[#e8643a] hover:underline"
+            >
+              Back to login
+            </button>
+          </div>
+        </div>
+      )}
+
+      {mode === "forgot-sent" && (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => setMode("login")}
+            className="text-sm font-semibold text-emerald-600 dark:text-[#e8643a] hover:underline"
+          >
+            Back to login
+          </button>
+        </div>
+      )}
+    </AuthLayout>
   );
 }
 
