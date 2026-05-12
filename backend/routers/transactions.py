@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks,Request
 from sqlalchemy.orm import Session
 from models.transaction import Transaction
 from schemas.transaction import TransactionCreate,TransactionResponse,TransactionUpdate
@@ -8,15 +8,17 @@ from datetime import timezone
 from core.recurring import process_recurring_transactions
 from core.currency import get_exchange_rates,convert_amount
 from core.auth import get_current_user
-
+from core.limiter import limiter
 
 router = APIRouter(
     prefix="/transactions",
     tags=["transactions"]
 )
-@router.post("/",response_model=TransactionResponse) # reponse model means the return value
+
+@router.post("/",response_model=TransactionResponse)
+@limiter.limit("30/minute")
 # : means the type of variable should be, in this case data should be TransactionCreate type
-def create_transaction(data: TransactionCreate, db: Session = Depends(get_db)):
+def create_transaction(request:Request,data: TransactionCreate, db: Session = Depends(get_db)):
     new_transaction = Transaction(**data.model_dump()) #models dump means convert pydantic schema into a plain dictionary, ** unpacks it as keyword arguments
     db.add(new_transaction)
     db.commit()

@@ -6,6 +6,9 @@ from core.database import (
 )
 from routers import transactions,budgets,categories,analysis,goals,settings,export,currency
 from core.auth import fetch_jwks
+from core.limiter import limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
 
 app = FastAPI()
 origins = [
@@ -23,7 +26,9 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     await fetch_jwks()
-    
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.include_router(transactions.router)
 app.include_router(budgets.router)
 app.include_router(categories.router)
