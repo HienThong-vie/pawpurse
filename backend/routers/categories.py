@@ -29,8 +29,8 @@ def get_category(user_id: str = Depends(get_current_user),db:Session=Depends(get
     return categories
 
 @router.delete("/{category_id}")
-def delete_transaction(id: int, user_id: str = Depends(get_current_user), db: Session = Depends(get_db)):
-    filtered_category = db.query(Category).filter(Category.user_id == user_id,Category.id == id).first()
+def delete_category(category_id: int, user_id: str = Depends(get_current_user), db: Session = Depends(get_db)):
+    filtered_category = db.query(Category).filter(Category.user_id == user_id, Category.id == category_id).first()
     if not filtered_category:
         raise HTTPException(status_code = 404, detail="Category not found")
     db.delete(filtered_category)
