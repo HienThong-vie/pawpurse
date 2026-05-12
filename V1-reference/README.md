@@ -1,2 +1,0 @@
-# SmartFinanceTracker
-Custom Project
