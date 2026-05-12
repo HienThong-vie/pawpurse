@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.database import (
@@ -10,10 +11,12 @@ from core.limiter import limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 
+frontend_url = os.getenv(" FRONTEND_URL")
 app = FastAPI()
 origins = [
     "http://localhost:5173",
-    "http://localhost:5174" #frontend url
+    "http://localhost:5174",
+    frontend_url
 ]
 
 app.add_middleware(
