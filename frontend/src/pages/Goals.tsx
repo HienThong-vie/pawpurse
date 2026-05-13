@@ -83,21 +83,18 @@ function Goals() {
         });
         toast.success("Goal added");
       } else {
-        await apiFetch(
-          `http://localhost:8000/goals/${editId}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              user_id: user?.id,
-              name,
-              target_amount: parseFloat(target_amount),
-              current_amount: parseFloat(current_amount) || 0,
-              deadline: deadline || null,
-              currency: baseCurrency,
-            }),
-          },
-        );
+        await apiFetch(`http://localhost:8000/goals/${editId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: user?.id,
+            name,
+            target_amount: parseFloat(target_amount),
+            current_amount: parseFloat(current_amount) || 0,
+            deadline: deadline || null,
+            currency: baseCurrency,
+          }),
+        });
         toast.success("Goal updated");
       }
       initPage();
@@ -171,14 +168,11 @@ function Goals() {
         }
       }
 
-      await apiFetch(
-        `http://localhost:8000/goals/${goal.id}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ current_amount: newStored }),
-        },
-      );
+      await apiFetch(`http://localhost:8000/goals/${goal.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ current_amount: newStored }),
+      });
       toast.success(
         `Added ${formatCurrency(added, baseCurrency)} to ${goal.name}`,
       );
@@ -194,6 +188,30 @@ function Goals() {
   const inputClass =
     "border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#666] bg-white dark:bg-[#0f0f0f] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/40 focus:border-emerald-500 dark:focus:border-[#e8643a]";
 
+  const Divider = () => (
+    <div className="w-px bg-gray-200 dark:bg-[#2a2a2a] self-stretch my-2 shrink-0" />
+  );
+
+  const hasFieldError = fieldErrors.name || fieldErrors.target_amount;
+  if (loading) {
+    return (
+      <div className="font-[Inter] animate-pulse">
+        <div className="mb-6 lg:mb-8">
+          <div className="h-8 w-32 bg-gray-200 dark:bg-[#222] rounded mb-2" />
+          <div className="h-4 w-48 bg-gray-200 dark:bg-[#222] rounded" />
+        </div>
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-32" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-5 h-32"
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
   if (loading) {
     return (
       <div className="font-[Inter] animate-pulse">
@@ -230,67 +248,77 @@ function Goals() {
         <ErrorBanner message={error} onDismiss={() => setError(null)} />
       )}
 
-      {/* Add / Update Goal */}
-      <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-4 lg:p-6 mb-6">
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-          {editId ? "Update Goal" : "Add Goal"}
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_auto] gap-3">
-          <div>
-            <input
-              type="text"
-              placeholder="Goal name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className={`${inputClass} w-full ${
-                fieldErrors.name ? "border-red-500 dark:border-red-500" : ""
-              }`}
-            />
-            {fieldErrors.name && (
-              <p className="text-xs text-red-500 dark:text-red-400 mt-1">
-                {fieldErrors.name}
-              </p>
-            )}
-          </div>
-          <div>
-            <input
-              type="number"
-              placeholder="Target amount"
-              value={target_amount}
-              onChange={(e) => setTargetAmount(e.target.value)}
-              className={`${inputClass} w-full ${
-                fieldErrors.target_amount
-                  ? "border-red-500 dark:border-red-500"
-                  : ""
-              }`}
-            />
-            {fieldErrors.target_amount && (
-              <p className="text-xs text-red-500 dark:text-red-400 mt-1">
-                {fieldErrors.target_amount}
-              </p>
-            )}
-          </div>
+      {/*Unified input bar  */}
+      <div className="mt-1">
+        <div
+          className={`
+            flex items-center
+            gap-6 px-2
+            border border-gray-200 dark:border-[#2a2a2a]
+            rounded-xl overflow-visible
+            bg-white dark:bg-[#0f0f0f]
+            shadow-sm
+            transition-all duration-150 ${hasFieldError ? "border-red-400 dark:border-red-500/60 ring-1 ring-red-400/30 dark:ring-red-500/20" : ""}`}
+        >
+          {/* goal input */}
+          <input
+            type="text"
+            placeholder="Goal name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className={`
+              flex-1 min-w-24 shrink-0 px-3.5 py-2.5 text-sm
+              bg-transparent border-none outline-none
+              text-gray-900 dark:text-white
+              placeholder-gray-400 dark:placeholder-[#555]
+              [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
+            ${
+              name
+                ? "text-gray-900 dark:text-white"
+                : fieldErrors.name
+                  ? "text-red-400"
+                  : "text-gray-400 dark:text-[#555]"
+            }`}
+          />
+
+          <Divider />
+          <input
+            type="number"
+            placeholder="Target amount"
+            value={target_amount}
+            onChange={(e) => setTargetAmount(e.target.value)}
+            className={`
+              flex-1 min-w-24 shrink-0 px-3.5 py-2.5 text-sm
+              bg-transparent border-none outline-none
+              text-gray-900 dark:text-white
+              placeholder-gray-400 dark:placeholder-[#555]
+              [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
+            ${
+              target_amount
+                ? "text-gray-900 dark:text-white"
+                : fieldErrors.target_amount
+                  ? "text-red-400"
+                  : "text-gray-400 dark:text-[#555]"
+            }`}
+          />
+          <Divider />
           <div>
             <input
               type="date"
               value={deadline}
               onChange={(e) => setDeadline(e.target.value)}
-              className={`${inputClass} w-full ${
-                fieldErrors.deadline ? "border-red-500 dark:border-red-500" : ""
-              }`}
+              className="w-36 shrink-0 px-3 py-2.5 text-sm bg-transparent border-none outline-none text-gray-900 dark:text-white dark:[color-scheme:dark]"
             />
-            {fieldErrors.deadline && (
-              <p className="text-xs text-red-500 dark:text-red-400 mt-1">
-                {fieldErrors.deadline}
-              </p>
-            )}
           </div>
+
+          <Divider />
+
           <div className="flex gap-2">
             {editId !== null && (
               <button
                 type="button"
                 onClick={handleCancelEdit}
-                className="px-4 py-2 rounded-lg border border-gray-200 dark:border-[#2a2a2a] text-sm font-semibold text-gray-700 dark:text-white bg-white dark:bg-[#0f0f0f] hover:bg-gray-50 dark:hover:bg-[#222] transition-colors"
+                className="mr-1 px-3 py-1.5 rounded-lg text-sm font-semibold text-gray-600 dark:text-[#aaa] hover:bg-gray-100 dark:hover:bg-[#222] transition-colors"
               >
                 Cancel
               </button>
@@ -298,7 +326,7 @@ function Goals() {
             <button
               onClick={() => handleSubmit()}
               disabled={submitting}
-              className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 mr-3.5 px-4 py-1.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
               {submitting
@@ -311,11 +339,19 @@ function Goals() {
             </button>
           </div>
         </div>
-      </section>
+        {/* Inline validation message */}
+        {hasFieldError && (
+          <p className="mt-1.5 ml-1 text-xs text-red-500 dark:text-red-400">
+            {[fieldErrors.name, fieldErrors.target_amount]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        )}
+      </div>
 
       {/* Goals grid */}
       {goals.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
           {goals.map((goal) => {
             const percentage =
               goal.target_amount > 0

@@ -252,7 +252,13 @@ function Budget() {
               text-gray-900 dark:text-white
               placeholder-gray-400 dark:placeholder-[#555]
               [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
-            `}
+            ${
+              limit
+                ? "text-gray-900 dark:text-white"
+                : fieldErrors.limit
+                  ? "text-red-400"
+                  : "text-gray-400 dark:text-[#555]"
+            }`}
           />
           <Divider />
 

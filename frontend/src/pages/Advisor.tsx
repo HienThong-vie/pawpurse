@@ -123,7 +123,9 @@ function Advisor() {
         </p>
       </header>
 
-      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+      {error && (
+        <ErrorBanner message={error} onDismiss={() => setError(null)} />
+      )}
 
       {/* AI Chat (coming soon) */}
       <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-4 lg:p-6 mb-6 lg:mb-8">
