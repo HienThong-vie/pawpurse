@@ -449,7 +449,7 @@ function Transactions() {
               setFieldErrors((p) => ({ ...p, amount: undefined }));
             }}
             className={`
-              flex-1 min-w-0 shrink-0 px-3.5 py-2.5 text-sm
+              flex-1 min-w-24 shrink-0 px-3.5 py-2.5 text-sm
               bg-transparent border-none outline-none
               text-gray-900 dark:text-white
               placeholder-gray-400 dark:placeholder-[#555]
@@ -516,29 +516,46 @@ function Transactions() {
 
             {/* Dropdown panel */}
             {showCategoryDropdown && (
-              <div className="absolute top-full left-0 mt-1.5 w-52 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] rounded-xl shadow-lg z-50 overflow-hidden py-1">
+              <div className="thin-scrollbar absolute top-full left-0 mt-1.5 w-52 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] rounded-xl shadow-lg z-50 overflow-hidden py-1">
                 {/* Category list */}
                 {categories.length > 0 ? (
                   <div className="max-h-48 overflow-y-auto">
                     {categories.map((cat) => (
-                      <button
+                      <div
                         key={cat.id}
-                        type="button"
-                        onClick={() => {
-                          setCategory(cat.name);
-                          setShowCategoryDropdown(false);
-                          setFieldErrors((p) => ({
-                            ...p,
-                            category: undefined,
-                          }));
-                        }}
-                        className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-[#e0e0e0] hover:bg-gray-50 dark:hover:bg-[#222] transition-colors text-left"
+                        className="group w-full flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-[#e0e0e0] hover:bg-gray-50 dark:hover:bg-[#222] transition-colors"
                       >
-                        {cat.name}
-                        {category === cat.name && (
-                          <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-[#e8643a]" />
-                        )}
-                      </button>
+                        {/* Selection Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCategory(cat.name);
+                            setShowCategoryDropdown(false);
+                            setFieldErrors((p) => ({
+                              ...p,
+                              category: undefined,
+                            }));
+                          }}
+                          className="flex-1 text-left flex items-center justify-between"
+                        >
+                          {cat.name}
+                          {category === cat.name && (
+                            <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-[#e8643a] mr-2" />
+                          )}
+                        </button>
+
+                        {/* Delete Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevents selecting the category when deleting
+                            handleDeleteCategory(cat.id); // Replace with your actual delete function
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-opacity"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 ) : (
@@ -694,35 +711,34 @@ function Transactions() {
           <Divider />
 
           {/* Submit button */}
-          <div className="px-1.5 py-1.5 shrink-0">
-            {editId !== null && (
-              <button
-                type="button"
-                onClick={resetForm}
-                className="mr-1 px-3 py-1.5 rounded-lg text-sm font-semibold text-gray-600 dark:text-[#aaa] hover:bg-gray-100 dark:hover:bg-[#222] transition-colors"
-              >
-                Cancel
-              </button>
-            )}
+
+          {editId !== null && (
             <button
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+              type="button"
+              onClick={resetForm}
+              className="mr-1 px-3 py-1.5 rounded-lg text-sm font-semibold text-gray-600 dark:text-[#aaa] hover:bg-gray-100 dark:hover:bg-[#222] transition-colors"
             >
-              {submitting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Plus className="w-4 h-4" />
-              )}
-              {submitting
-                ? editId
-                  ? "Updating..."
-                  : "Adding..."
-                : editId
-                  ? "Update"
-                  : "Add"}
+              Cancel
             </button>
-          </div>
+          )}
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="flex items-center gap-1.5 p-l mr-3.5 px-4 py-1.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            {submitting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Plus className="w-4 h-4" />
+            )}
+            {submitting
+              ? editId
+                ? "Updating..."
+                : "Adding..."
+              : editId
+                ? "Update"
+                : "Add"}
+          </button>
         </div>
 
         {/* Inline validation message */}
