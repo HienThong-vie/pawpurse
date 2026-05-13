@@ -248,6 +248,8 @@ function Transactions() {
             category,
             note,
             date: effectiveDate,
+            is_recurring,
+            recurring_interval,
           }),
         });
         toast.success("Transaction updated");
@@ -373,7 +375,7 @@ function Transactions() {
 
   // Divider between segments
   const Divider = () => (
-    <div className="w-px bg-gray-200 dark:bg-[#2a2a2a] self-stretch my-2 shrink-0" />
+    <div className="w-px bg-gray-300 dark:bg-[#2a2a2a] self-stretch my-2 shrink-0" />
   );
 
   const sortLabels: Record<SortKey, string> = {
@@ -393,8 +395,8 @@ function Transactions() {
           <div className="h-8 w-40 bg-gray-200 dark:bg-[#222] rounded mb-2" />
           <div className="h-4 w-56 bg-gray-200 dark:bg-[#222] rounded" />
         </div>
-        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-16" />
-        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm h-64 mt-6" />
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-16" />
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm h-64 mt-6" />
       </div>
     );
   }
@@ -431,7 +433,8 @@ function Transactions() {
         <div
           className={`
             flex items-center
-            border border-gray-200 dark:border-[#2a2a2a]
+            gap-2 
+            border border-gray-300 dark:border-[#2a2a2a]
             rounded-xl overflow-visible
             bg-white dark:bg-[#0f0f0f]
             shadow-sm
@@ -516,7 +519,7 @@ function Transactions() {
 
             {/* Dropdown panel */}
             {showCategoryDropdown && (
-              <div className="thin-scrollbar absolute top-full left-0 mt-1.5 w-52 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] rounded-xl shadow-lg z-50 overflow-hidden py-1">
+              <div className="thin-scrollbar absolute top-full left-0 mt-1.5 w-52 bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-[#2a2a2a] rounded-xl shadow-lg z-50 overflow-hidden py-1">
                 {/* Category list */}
                 {categories.length > 0 ? (
                   <div className="max-h-48 overflow-y-auto">
@@ -593,7 +596,7 @@ function Transactions() {
                             setNewCategoryName("");
                           }
                         }}
-                        className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#0f0f0f] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a]"
+                        className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-[#2a2a2a] bg-white dark:bg-[#0f0f0f] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a]"
                       />
                       <button
                         type="button"
@@ -676,7 +679,7 @@ function Transactions() {
 
             {/* Recurring interval dropdown */}
             {showRecurringDropdown && (
-              <div className="absolute top-full right-0 mt-1.5 w-36 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] rounded-xl shadow-lg z-50 py-1 overflow-hidden">
+              <div className="absolute top-full right-0 mt-1.5 w-36 bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-[#2a2a2a] rounded-xl shadow-lg z-50 py-1 overflow-hidden">
                 {["daily", "weekly", "monthly"].map((interval) => (
                   <button
                     key={interval}
@@ -707,11 +710,8 @@ function Transactions() {
               </div>
             )}
           </div>
-
           <Divider />
-
           {/* Submit button */}
-
           {editId !== null && (
             <button
               type="button"
@@ -724,7 +724,7 @@ function Transactions() {
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="flex items-center gap-1.5 p-l mr-3.5 px-4 py-1.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+            className="flex items-center gap-1.5 p-l mr-3.5 px-4 py-1.5 rounded-lg bg-transparent text-gray-600 text-sm font-semibold hover:text-white hover:bg-emerald-600 dark:hover:bg-[#d2552d] dark:text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
           >
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -750,7 +750,6 @@ function Transactions() {
           </p>
         )}
       </div>
-
       {/* ── SEARCH / FILTER BAR ── */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-5 mb-3">
         {/* Search */}
@@ -761,7 +760,7 @@ function Transactions() {
             placeholder="Search by note or category..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#0f0f0f] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a]"
+            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-[#2a2a2a] bg-white dark:bg-[#0f0f0f] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a]"
           />
         </div>
 
@@ -775,7 +774,7 @@ function Transactions() {
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
                 typeFilter === key
                   ? "bg-emerald-500 dark:bg-[#e8643a] text-white"
-                  : "bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] text-gray-600 dark:text-[#a0a0a0] hover:bg-gray-50 dark:hover:bg-[#222]"
+                  : "bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-[#2a2a2a] text-gray-600 dark:text-[#a0a0a0] hover:bg-gray-50 dark:hover:bg-[#222]"
               }`}
             >
               {key === "all" ? "All" : key}
@@ -788,7 +787,7 @@ function Transactions() {
           <button
             type="button"
             onClick={() => setShowSortDropdown((p) => !p)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1a1a1a] text-sm text-gray-600 dark:text-[#a0a0a0] hover:bg-gray-50 dark:hover:bg-[#222] transition-colors whitespace-nowrap"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-[#2a2a2a] bg-white dark:bg-[#1a1a1a] text-sm text-gray-600 dark:text-[#a0a0a0] hover:bg-gray-50 dark:hover:bg-[#222] transition-colors whitespace-nowrap"
           >
             {sortLabels[sortBy]}
             <ChevronDown
@@ -796,7 +795,7 @@ function Transactions() {
             />
           </button>
           {showSortDropdown && (
-            <div className="absolute top-full right-0 mt-1.5 w-44 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] rounded-xl shadow-lg z-50 py-1 overflow-hidden">
+            <div className="absolute top-full right-0 mt-1.5 w-44 bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-[#2a2a2a] rounded-xl shadow-lg z-50 py-1 overflow-hidden">
               {(Object.keys(sortLabels) as SortKey[]).map((key) => (
                 <button
                   key={key}
@@ -819,7 +818,7 @@ function Transactions() {
       </div>
 
       {/* ── TRANSACTION TABLE ── */}
-      <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm overflow-hidden">
+      <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm overflow-hidden">
         {displayedTransactions.length > 0 ? (
           <div
             className="overflow-auto thin-scrollbar"
@@ -827,23 +826,23 @@ function Transactions() {
           >
             <table className="w-full text-sm min-w-[600px]">
               <thead className="sticky top-0 z-10">
-                <tr className="bg-gray-50 dark:bg-[#222] border-b border-gray-200 dark:border-[#2a2a2a]">
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#666]">
+                <tr className="bg-gray-50 dark:bg-[#222] border-b border-gray-300 dark:border-[#2a2a2a]">
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
                     Date
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#666]">
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
                     Type
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#666]">
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
                     Category
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#666]">
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
                     Note
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#666]">
+                  <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
                     Amount
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#666]">
+                  <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
                     Actions
                   </th>
                 </tr>
@@ -858,7 +857,7 @@ function Transactions() {
                         : ""
                     }`}
                   >
-                    <td className="px-4 py-3 text-gray-500 dark:text-[#666] whitespace-nowrap text-xs">
+                    <td className="px-4 py-3 text-gray-500 dark:text-[#e0e0e0] whitespace-nowrap text-xs">
                       {formatDate(t.created_at)}
                     </td>
                     <td className="px-4 py-3">
@@ -915,7 +914,7 @@ function Transactions() {
                       <div className="flex justify-end gap-1.5">
                         <button
                           onClick={() => handleEdit(t)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-gray-200 dark:border-[#2a2a2a] text-xs font-medium text-gray-600 dark:text-[#e0e0e0] bg-white dark:bg-[#0f0f0f] hover:bg-gray-50 dark:hover:bg-[#222] transition-colors"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-gray-300 dark:border-[#2a2a2a] text-xs font-medium text-gray-600 dark:text-[#e0e0e0] bg-white dark:bg-[#0f0f0f] hover:bg-gray-50 dark:hover:bg-[#222] transition-colors"
                         >
                           <Pencil className="w-3 h-3" /> Edit
                         </button>

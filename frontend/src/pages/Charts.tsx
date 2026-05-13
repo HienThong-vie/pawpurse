@@ -165,12 +165,12 @@ function Charts() {
 
         {/* Two-column grid */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6">
-          <div className="lg:col-span-3 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6">
+          <div className="lg:col-span-3 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6">
             <div className="h-5 w-40 bg-gray-200 dark:bg-[#222] rounded mb-2" />
             <div className="h-4 w-64 bg-gray-200 dark:bg-[#222] rounded mb-6" />
             <div className="h-72 bg-gray-100 dark:bg-[#222] rounded-lg" />
           </div>
-          <div className="lg:col-span-2 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6">
+          <div className="lg:col-span-2 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6">
             <div className="h-5 w-44 bg-gray-200 dark:bg-[#222] rounded mb-2" />
             <div className="h-4 w-32 bg-gray-200 dark:bg-[#222] rounded mb-6" />
             <div className="flex flex-col items-center gap-4">
@@ -196,7 +196,9 @@ function Charts() {
         </p>
       </header>
 
-      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+      {error && (
+        <ErrorBanner message={error} onDismiss={() => setError(null)} />
+      )}
 
       {/* Time filter */}
       <div className="flex gap-2 mb-6">
@@ -213,7 +215,7 @@ function Charts() {
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               timeFilter === key
                 ? "bg-emerald-500 dark:bg-[#e8643a] text-white"
-                : "bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] text-gray-600 dark:text-[#a0a0a0] hover:bg-gray-50 dark:hover:bg-[#222]"
+                : "bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-[#2a2a2a] text-gray-600 dark:text-[#a0a0a0] hover:bg-gray-50 dark:hover:bg-[#222]"
             }`}
           >
             {label}
@@ -224,7 +226,7 @@ function Charts() {
       {/* Two-column grid: 60/40 */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6">
         {/* Monthly Trend — 60% */}
-        <section className="lg:col-span-3 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-4 lg:p-6">
+        <section className="lg:col-span-3 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-4 lg:p-6">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
             Monthly Trend
           </h2>
@@ -332,7 +334,7 @@ function Charts() {
         </section>
 
         {/* Spending Breakdown — 40% */}
-        <section className="lg:col-span-2 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-4 lg:p-6">
+        <section className="lg:col-span-2 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-4 lg:p-6">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
             Spending Breakdown
           </h2>
@@ -410,10 +412,7 @@ function Charts() {
                       </span>
                       <span className="flex items-center gap-2 shrink-0">
                         <span className="font-semibold text-gray-900 dark:text-white">
-                          {formatCurrency(
-                            entry.value as number,
-                            baseCurrency,
-                          )}
+                          {formatCurrency(entry.value as number, baseCurrency)}
                         </span>
                         <span className="text-xs text-gray-500 dark:text-[#a0a0a0] tabular-nums w-10 text-right">
                           {pct.toFixed(1)}%

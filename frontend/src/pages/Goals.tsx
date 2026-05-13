@@ -186,10 +186,10 @@ function Goals() {
   }
 
   const inputClass =
-    "border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#666] bg-white dark:bg-[#0f0f0f] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/40 focus:border-emerald-500 dark:focus:border-[#e8643a]";
+    "border border-gray-300 dark:border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#666] bg-white dark:bg-[#0f0f0f] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/40 focus:border-emerald-500 dark:focus:border-[#e8643a]";
 
   const Divider = () => (
-    <div className="w-px bg-gray-200 dark:bg-[#2a2a2a] self-stretch my-2 shrink-0" />
+    <div className="w-px bg-gray-300 dark:bg-[#2a2a2a] self-stretch my-2 shrink-0" />
   );
 
   const hasFieldError = fieldErrors.name || fieldErrors.target_amount;
@@ -200,12 +200,12 @@ function Goals() {
           <div className="h-8 w-32 bg-gray-200 dark:bg-[#222] rounded mb-2" />
           <div className="h-4 w-48 bg-gray-200 dark:bg-[#222] rounded" />
         </div>
-        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-32" />
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-32" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[0, 1, 2, 3].map((i) => (
             <div
               key={i}
-              className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-5 h-32"
+              className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-5 h-32"
             />
           ))}
         </div>
@@ -219,12 +219,12 @@ function Goals() {
           <div className="h-8 w-24 bg-gray-200 dark:bg-[#222] rounded mb-2" />
           <div className="h-4 w-44 bg-gray-200 dark:bg-[#222] rounded" />
         </div>
-        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-32" />
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-32" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[0, 1, 2, 3].map((i) => (
             <div
               key={i}
-              className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-5 h-44"
+              className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-5 h-44"
             />
           ))}
         </div>
@@ -254,7 +254,7 @@ function Goals() {
           className={`
             flex items-center
             gap-6 px-2
-            border border-gray-200 dark:border-[#2a2a2a]
+            border border-gray-300 dark:border-[#2a2a2a]
             rounded-xl overflow-visible
             bg-white dark:bg-[#0f0f0f]
             shadow-sm
@@ -267,7 +267,7 @@ function Goals() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             className={`
-              flex-1 min-w-24 shrink-0 px-3.5 py-2.5 text-sm
+              flex-1 min-w-45 shrink-0 px-3.5 py-2.5 text-sm
               bg-transparent border-none outline-none
               text-gray-900 dark:text-white
               placeholder-gray-400 dark:placeholder-[#555]
@@ -288,7 +288,7 @@ function Goals() {
             value={target_amount}
             onChange={(e) => setTargetAmount(e.target.value)}
             className={`
-              flex-1 min-w-24 shrink-0 px-3.5 py-2.5 text-sm
+              min-w-24 shrink-0 px-3.5 py-2.5 text-sm
               bg-transparent border-none outline-none
               text-gray-900 dark:text-white
               placeholder-gray-400 dark:placeholder-[#555]
@@ -326,7 +326,7 @@ function Goals() {
             <button
               onClick={() => handleSubmit()}
               disabled={submitting}
-              className="flex items-center gap-1.5 mr-3.5 px-4 py-1.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+              className="flex items-center gap-1.5 p-l mr-3.5 px-4 py-1.5 rounded-lg bg-transparent text-gray-600 text-sm font-semibold hover:text-white hover:bg-emerald-600 dark:hover:bg-[#d2552d] dark:text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
               {submitting
@@ -363,7 +363,7 @@ function Goals() {
             return (
               <div
                 key={goal.id}
-                className="relative bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-5"
+                className="relative bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-5"
               >
                 {/* Top right actions */}
                 <div className="absolute top-3 right-3 flex gap-1">
@@ -426,7 +426,7 @@ function Goals() {
                         [goal.id]: e.target.value,
                       })
                     }
-                    className={`${inputClass} flex-1`}
+                    className={`${inputClass} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none flex-1`}
                   />
                   <button
                     onClick={() => handleAddProgress(goal)}
@@ -446,7 +446,7 @@ function Goals() {
           })}
         </div>
       ) : (
-        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-12 flex flex-col items-center text-center">
+        <div className="bg-white mt-5 dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-12 flex flex-col items-center text-center">
           <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-[#e8643a]/10 flex items-center justify-center mb-3">
             <Target className="w-6 h-6 text-emerald-600 dark:text-[#e8643a]" />
           </div>

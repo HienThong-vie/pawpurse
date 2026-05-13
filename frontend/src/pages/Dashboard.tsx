@@ -130,7 +130,7 @@ function Dashboard() {
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6"
+              className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6"
             >
               <div className="flex items-center justify-between mb-4">
                 <div className="h-4 w-24 bg-gray-200 dark:bg-[#222] rounded" />
@@ -143,7 +143,7 @@ function Dashboard() {
 
         {/* Two column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
-          <div className="lg:col-span-2 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6">
+          <div className="lg:col-span-2 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6">
             <div className="h-5 w-40 bg-gray-200 dark:bg-[#222] rounded mb-5" />
             <div className="flex flex-col gap-4">
               {[0, 1, 2, 3].map((i) => (
@@ -157,7 +157,7 @@ function Dashboard() {
               ))}
             </div>
           </div>
-          <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6">
+          <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6">
             <div className="h-5 w-32 bg-gray-200 dark:bg-[#222] rounded mb-5" />
             <div className="flex flex-col gap-3">
               {[0, 1, 2].map((i) => (
@@ -185,11 +185,13 @@ function Dashboard() {
         </p>
       </header>
 
-      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+      {error && (
+        <ErrorBanner message={error} onDismiss={() => setError(null)} />
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 mb-6 lg:mb-8">
-        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6">
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6">
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-gray-500 dark:text-[#a0a0a0] font-medium">
               Total Income
@@ -203,7 +205,7 @@ function Dashboard() {
           </p>
         </div>
 
-        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6">
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6">
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-gray-500 dark:text-[#a0a0a0] font-medium">
               Total Expense
@@ -217,7 +219,7 @@ function Dashboard() {
           </p>
         </div>
 
-        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6">
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6">
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-gray-500 dark:text-[#a0a0a0] font-medium">
               Balance
@@ -235,7 +237,7 @@ function Dashboard() {
       {/* Two column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
         {/* Spending by Category — wider */}
-        <section className="col-span-2 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6">
+        <section className="col-span-2 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-5">
             Spending by Category
           </h2>
@@ -281,7 +283,7 @@ function Dashboard() {
         </section>
 
         {/* Smart Alerts — narrower */}
-        <section className="col-span-1 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6">
+        <section className="col-span-1 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-5">
             Smart Alerts
           </h2>

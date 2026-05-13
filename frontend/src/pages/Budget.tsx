@@ -7,6 +7,7 @@ import {
   Plus,
   ChevronDown,
   Check,
+  X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -38,7 +39,14 @@ function Budget() {
   const [loading, setLoading] = useState(true);
   // Category dropdown state
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [submittingCategory, setSubmittingCategory] = useState(false);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
+  const newCategoryInputRef = useRef<HTMLInputElement>(null);
+  // Period dropdown state
+  const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
+  const periodDropdownRef = useRef<HTMLDivElement>(null);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -93,6 +101,8 @@ function Budget() {
         !categoryDropdownRef.current.contains(e.target as Node)
       ) {
         setShowCategoryDropdown(false);
+        setShowAddCategory(false);
+        setNewCategoryName("");
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -169,8 +179,33 @@ function Budget() {
     setPeriod(budget.period);
   }
 
+  async function handleAddCategory() {
+    if (!newCategoryName.trim()) return;
+    setSubmittingCategory(true);
+    try {
+      await apiFetch(`http://localhost:8000/categories/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: user?.id,
+          name: newCategoryName.trim(),
+        }),
+      });
+      toast.success("Category added");
+      await fetchCategories();
+      setCategory(newCategoryName.trim());
+      setNewCategoryName("");
+      setShowAddCategory(false);
+      setShowCategoryDropdown(false);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSubmittingCategory(false);
+    }
+  }
+
   const Divider = () => (
-    <div className="w-px bg-gray-200 dark:bg-[#2a2a2a] self-stretch my-2 shrink-0" />
+    <div className="w-px bg-gray-300 dark:bg-[#2a2a2a] self-stretch my-2 shrink-0" />
   );
 
   const hasFieldError =
@@ -182,12 +217,12 @@ function Budget() {
           <div className="h-8 w-32 bg-gray-200 dark:bg-[#222] rounded mb-2" />
           <div className="h-4 w-48 bg-gray-200 dark:bg-[#222] rounded" />
         </div>
-        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-32" />
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-32" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[0, 1, 2, 3].map((i) => (
             <div
               key={i}
-              className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-5 h-32"
+              className="bg-white  rounded-xl border border-gray-300 dark:border-[#2a2a2a] dark:bg-[#1a1a1a] shadow-sm p-5 h-32"
             />
           ))}
         </div>
@@ -231,7 +266,7 @@ function Budget() {
           className={`
             flex items-center
             gap-6 px-2
-            border border-gray-200 dark:border-[#2a2a2a]
+            border border-gray-300 dark:border-[#2a2a2a]
             rounded-xl overflow-visible
             bg-white dark:bg-[#0f0f0f]
             shadow-sm
@@ -262,12 +297,13 @@ function Budget() {
           />
           <Divider />
 
-          {/* Category custom dropdown*/}
+          {/* Category custom dropdown */}
           <div className="relative shrink-0" ref={categoryDropdownRef}>
             <button
               type="button"
               onClick={() => {
                 setShowCategoryDropdown((p) => !p);
+                setShowAddCategory(false);
               }}
               className={`
                 flex items-center gap-1.5 px-3 py-2.5 text-sm
@@ -290,7 +326,7 @@ function Budget() {
 
             {/* Dropdown panel */}
             {showCategoryDropdown && (
-              <div className="thin-scrollbar absolute top-full left-0 mt-1.5 w-52 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] rounded-xl shadow-lg z-50 overflow-hidden py-1">
+              <div className="thin-scrollbar absolute top-full left-0 mt-1.5 w-52 bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-[#2a2a2a] rounded-xl shadow-lg z-50 overflow-hidden py-1">
                 {/* Category list */}
                 {categories.length > 0 ? (
                   <div className="max-h-48 overflow-y-auto">
@@ -320,32 +356,120 @@ function Budget() {
                     No categories yet
                   </p>
                 )}
+
+                {/* Divider */}
+                <div className="h-px bg-gray-100 dark:bg-[#2a2a2a] mx-2 my-1" />
+
+                {/* Add new category */}
+                {!showAddCategory ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCategory(true)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-emerald-600 dark:text-[#e8643a] hover:bg-gray-50 dark:hover:bg-[#222] transition-colors font-medium"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add new category
+                  </button>
+                ) : (
+                  <div className="px-2 pb-2 pt-1">
+                    <div className="flex gap-1.5">
+                      <input
+                        ref={newCategoryInputRef}
+                        type="text"
+                        placeholder="Category name"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleAddCategory();
+                          if (e.key === "Escape") {
+                            setShowAddCategory(false);
+                            setNewCategoryName("");
+                          }
+                        }}
+                        className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-[#2a2a2a] bg-white dark:bg-[#0f0f0f] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a]"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddCategory}
+                        disabled={submittingCategory || !newCategoryName.trim()}
+                        className="px-2.5 py-1.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-xs font-semibold disabled:opacity-50 hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors"
+                      >
+                        {submittingCategory ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          "Add"
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddCategory(false);
+                          setNewCategoryName("");
+                        }}
+                        className="px-2 py-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
           <Divider />
-          <div>
-            <select
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-              className={`w-36 shrink-0 px-3 py-2.5 text-sm bg-transparent border-none outline-none text-gray-900 dark:text-white  ${
-                period
-                  ? "text-gray-900 dark:text-white"
-                  : fieldErrors.period
-                    ? "text-red-400"
-                    : "text-gray-400 dark:text-[#555]"
-              }`}
+          {/* Period custom dropdown */}
+          <div className="relative shrink-0" ref={periodDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setShowPeriodDropdown((p) => !p)}
+              className={`
+      flex items-center gap-1.5 px-3 py-2.5 text-sm
+      bg-transparent border-none outline-none
+      transition-colors whitespace-nowrap
+      ${
+        period
+          ? "text-gray-900 dark:text-white"
+          : fieldErrors.period
+            ? "text-red-400"
+            : "text-gray-400 dark:text-[#555]"
+      }`}
             >
-              <option className="dark:bg-[#1a1a1a] " value="">
-                Select Period
-              </option>
-              <option className="dark:bg-[#1a1a1a] " value="week">
-                Week
-              </option>
-              <option className="dark:bg-[#1a1a1a] " value="month">
-                Month
-              </option>
-            </select>
+              {/* Capitalize the first letter of the period or show placeholder */}
+              {period
+                ? period.charAt(0).toUpperCase() + period.slice(1)
+                : "Select period"}
+              <ChevronDown
+                className={`w-3.5 h-3.5 transition-transform duration-150 ${
+                  showPeriodDropdown ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {/* Dropdown panel */}
+            {showPeriodDropdown && (
+              <div className="absolute top-full left-0 mt-1.5 w-36 bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-[#2a2a2a] rounded-xl shadow-lg z-50 overflow-hidden py-1">
+                {["week", "month"].map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => {
+                      setPeriod(p);
+                      setShowPeriodDropdown(false);
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        period: undefined,
+                      }));
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-[#e0e0e0] hover:bg-gray-50 dark:hover:bg-[#222] transition-colors text-left"
+                  >
+                    <span className="capitalize">{p}</span>
+                    {period === p && (
+                      <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-[#e8643a]" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <Divider />
           {editId !== null && (
@@ -360,7 +484,7 @@ function Budget() {
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="flex items-center gap-1.5 mr-3.5 px-4 py-1.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+            className="flex items-center gap-1.5 p-l mr-3.5 px-4 py-1.5 rounded-lg bg-transparent text-gray-600 text-sm font-semibold hover:text-white hover:bg-emerald-600 dark:hover:bg-[#d2552d] dark:text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
           >
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -395,7 +519,7 @@ function Budget() {
             return (
               <div
                 key={budget.id}
-                className="relative bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-5"
+                className="relative bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-5"
               >
                 {/* Top right actions */}
                 <div className="absolute top-3 right-3 flex gap-1">
@@ -450,7 +574,7 @@ function Budget() {
           })}
         </div>
       ) : (
-        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-12 flex flex-col items-center text-center">
+        <div className="bg-white mt-5 dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-12 flex flex-col items-center text-center">
           <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-[#e8643a]/10 flex items-center justify-center mb-3">
             <Wallet className="w-6 h-6 text-emerald-600 dark:text-[#e8643a]" />
           </div>

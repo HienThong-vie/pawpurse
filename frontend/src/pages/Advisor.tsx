@@ -80,7 +80,7 @@ function Advisor() {
     `px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
       active
         ? "bg-emerald-500 dark:bg-[#e8643a] text-white"
-        : "bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] text-gray-600 dark:text-[#a0a0a0] hover:bg-gray-50 dark:hover:bg-[#222]"
+        : "bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-[#2a2a2a] text-gray-600 dark:text-[#a0a0a0] hover:bg-gray-50 dark:hover:bg-[#222]"
     }`;
 
   const hasBudgets =
@@ -94,7 +94,7 @@ function Advisor() {
           <div className="h-8 w-48 bg-gray-200 dark:bg-[#222] rounded mb-2" />
           <div className="h-4 w-56 bg-gray-200 dark:bg-[#222] rounded" />
         </div>
-        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-72" />
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-72" />
         <div className="flex gap-2 mb-6">
           <div className="h-9 w-24 bg-gray-200 dark:bg-[#222] rounded-lg" />
           <div className="h-9 w-32 bg-gray-200 dark:bg-[#222] rounded-lg" />
@@ -103,7 +103,7 @@ function Advisor() {
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm h-16"
+              className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm h-16"
             />
           ))}
         </div>
@@ -128,7 +128,7 @@ function Advisor() {
       )}
 
       {/* AI Chat (coming soon) */}
-      <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-4 lg:p-6 mb-6 lg:mb-8">
+      <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-4 lg:p-6 mb-6 lg:mb-8">
         <div className="flex items-center gap-2 mb-1">
           <Sparkles className="w-5 h-5 text-emerald-600 dark:text-[#e8643a]" />
           <h2 className="text-lg font-bold text-gray-900 dark:text-white">
@@ -164,7 +164,7 @@ function Advisor() {
             type="text"
             placeholder="Ask me anything about your finances..."
             disabled
-            className="flex-1 border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#666] bg-white dark:bg-[#0f0f0f] focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex-1 border border-gray-300 dark:border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#666] bg-white dark:bg-[#0f0f0f] focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
           />
           <button
             disabled
@@ -196,7 +196,7 @@ function Advisor() {
 
       {/* Empty state */}
       {!hasBudgets && (
-        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm p-12 flex flex-col items-center text-center">
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-12 flex flex-col items-center text-center">
           <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-[#e8643a]/10 flex items-center justify-center mb-3">
             <Lightbulb className="w-6 h-6 text-emerald-600 dark:text-[#e8643a]" />
           </div>
@@ -217,7 +217,7 @@ function Advisor() {
             return (
               <div
                 key={index}
-                className={`flex items-center justify-between gap-4 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[#2a2a2a] border-l-4 ${statusBorder[status]} shadow-sm p-4`}
+                className={`flex items-center justify-between gap-4 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] border-l-4 ${statusBorder[status]} shadow-sm p-4`}
               >
                 <p className="text-sm text-gray-700 dark:text-[#e0e0e0] leading-relaxed">
                   {advice}
@@ -259,7 +259,7 @@ function Advisor() {
                     {group.map((item) => (
                       <div
                         key={item.category}
-                        className={`bg-white dark:bg-[#1a1a1a] rounded-lg border border-gray-200 dark:border-[#2a2a2a] border-l-4 ${statusBorder[status]} shadow-sm p-3 flex items-center justify-between`}
+                        className={`bg-white dark:bg-[#1a1a1a] rounded-lg border border-gray-300 dark:border-[#2a2a2a] border-l-4 ${statusBorder[status]} shadow-sm p-3 flex items-center justify-between`}
                       >
                         <span className="text-sm font-medium text-gray-900 dark:text-white">
                           {item.category}

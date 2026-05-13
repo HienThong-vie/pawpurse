@@ -33,7 +33,8 @@ def process_recurring_transactions(db: Session = Depends(get_db)):
                 date = datetime.now(timezone.utc),
                 is_recurring=False,
                 recurring_interval =None,
-                last_triggered=None
+                last_triggered=None,
+                currency = transaction.currency
             )
             db.add(new_transaction)
             transaction.last_triggered = today

@@ -49,7 +49,7 @@ function Layout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static z-50 flex flex-col w-64 min-h-screen bg-white dark:bg-[#1a1a1a] border-r border-gray-200 dark:border-[#2a2a2a] px-4 py-6 transform transition-transform lg:transform-none ${
+        className={`fixed lg:static z-50 flex flex-col w-64 min-h-screen bg-white dark:bg-[#1a1a1a] border-r border-gray-300 dark:border-[#2a2a2a] px-4 py-6 transform transition-transform lg:transform-none ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0`}
       >
@@ -108,7 +108,7 @@ function Layout() {
           </ul>
         </nav>
 
-        <div className="border-t border-gray-200 dark:border-[#2a2a2a] pt-4 mt-4">
+        <div className="border-t border-gray-300 dark:border-[#2a2a2a] pt-4 mt-4">
           <p className="text-gray-500 dark:text-[#a0a0a0] text-xs px-2 mb-2 truncate">
             {user?.email}
           </p>
@@ -133,7 +133,7 @@ function Layout() {
       {/* Main */}
       <main className="flex-1 min-w-0 bg-white dark:bg-[#0f0f0f]">
         {/* Mobile top bar */}
-        <div className="lg:hidden sticky top-0 z-30 bg-white dark:bg-[#0f0f0f] border-b border-gray-200 dark:border-[#2a2a2a] px-4 py-3 flex items-center gap-3">
+        <div className="lg:hidden sticky top-0 z-30 bg-white dark:bg-[#0f0f0f] border-b border-gray-300 dark:border-[#2a2a2a] px-4 py-3 flex items-center gap-3">
           <button
             onClick={() => setSidebarOpen(true)}
             className="p-1.5 rounded-md text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-[#222]"
