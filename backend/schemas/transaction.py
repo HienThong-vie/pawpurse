@@ -1,4 +1,4 @@
-from pydantic import BaseModel,ConfigDict
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
 
@@ -14,7 +14,7 @@ class TransactionCreate(BaseModel):
     recurring_interval : Optional[str] = None
     currency: Optional[str] = "USD"
 
-class TransactionUpdate(BaseModel): 
+class TransactionUpdate(BaseModel):
     amount: Optional[float] = None
     type: Optional[str] = None
     category: Optional[str] = None

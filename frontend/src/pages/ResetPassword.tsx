@@ -1,26 +1,17 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Lock, Eye, EyeOff, ShieldCheck, Loader2 } from "lucide-react";
+import { Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import supabase from "../lib/supabaseClient";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import AuthLayout from "../components/auth/AuthLayout";
 import GlassInput from "../components/auth/GlassInput";
 import PasswordStrength from "../components/auth/PasswordStrength";
 
-function ReassuranceCard() {
-  return (
-    <div className="absolute right-8 top-1/2 -translate-y-1/2 w-64 animate-element animate-delay-500 flex items-start gap-3 rounded-2xl bg-white/70 dark:bg-white/[0.05] backdrop-blur-xl border border-white/20 p-4 text-sm text-white">
-      <ShieldCheck className="w-5 h-5 shrink-0 mt-0.5" />
-      <p>
-        Pick a password you haven't used elsewhere. We'll log you in
-        automatically after the reset.
-      </p>
-    </div>
-  );
-}
 
 function ResetPassword() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
   const { isRecovering, setIsRecovering } = useAuth();
@@ -38,11 +29,11 @@ function ResetPassword() {
 
   async function updatePassword() {
     if (!newPassword || !confirmPassword) {
-      toast.error("Please fill in both fields");
+      toast.error(t("auth.errorFillBothFields"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast.error("Passwords do not match");
+      toast.error(t("auth.errorPasswordsNoMatch"));
       return;
     }
     setSubmitting(true);
@@ -53,7 +44,7 @@ function ResetPassword() {
       if (error) {
         toast.error(error.message);
       } else {
-        toast.success("Password updated");
+        toast.success(t("auth.toastPasswordUpdated"));
         setIsRecovering(false);
         navigate("/login");
       }
@@ -78,14 +69,13 @@ function ResetPassword() {
 
   return (
     <AuthLayout
-      title="Set a new password"
-      description="Almost there — choose a strong password to keep your account secure."
-      rightOverlay={<ReassuranceCard />}
+      title={t("auth.resetTitle")}
+      description={t("auth.resetDesc")}
     >
       <div className="space-y-5">
         <div>
           <GlassInput
-            label="New password"
+            label={t("auth.newPasswordLabel")}
             type={showNewPw ? "text" : "password"}
             placeholder="••••••••"
             value={newPassword}
@@ -109,7 +99,7 @@ function ResetPassword() {
           <PasswordStrength password={newPassword} />
         </div>
         <GlassInput
-          label="Confirm password"
+          label={t("auth.confirmPasswordLabel")}
           type={showConfirmPw ? "text" : "password"}
           placeholder="••••••••"
           value={confirmPassword}
@@ -136,7 +126,7 @@ function ResetPassword() {
           className="w-full rounded-2xl bg-emerald-500 dark:bg-[#e8643a] text-white py-4 text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-          {submitting ? "Updating..." : "Update password"}
+          {submitting ? t("auth.updatingPassword") : t("auth.updatePasswordBtn")}
         </button>
         <div className="flex justify-center">
           <button
@@ -146,7 +136,7 @@ function ResetPassword() {
             className="text-sm text-gray-500 dark:text-[#a0a0a0] hover:text-gray-700 dark:hover:text-white hover:underline transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {cancelling && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            {cancelling ? "Signing out..." : "Cancel and sign out"}
+            {cancelling ? t("auth.signingOut") : t("auth.cancelSignOut")}
           </button>
         </div>
       </div>

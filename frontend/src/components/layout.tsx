@@ -1,24 +1,41 @@
 import { useState } from "react";
-import { Outlet, useNavigate, NavLink } from "react-router-dom";
+import { Outlet, useNavigate, NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   ArrowLeftRight,
   Wallet,
   Target,
-  BarChart2,
   Lightbulb,
   Settings as SettingsIcon,
   LogOut,
   Menu,
   X,
+  Bell,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
+import { useNotifications } from "../context/NotificationContext";
 import supabase from "../lib/supabaseClient";
+import NotificationPanel from "./NotificationPanel";
+
+const SIDEBAR_ROUTES: Record<string, string> = {
+  "/dashboard": "sidebar.dashboard",
+  "/transactions": "sidebar.transactions",
+  "/budget": "sidebar.budget",
+  "/goals": "sidebar.goals",
+};
 
 function Layout() {
-  const { user } = useAuth();
+  const { user, username } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { t } = useTranslation();
+  const { unreadCount } = useNotifications();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+
+  const sidebarKey = SIDEBAR_ROUTES[location.pathname];
+  const showSidebar = Boolean(sidebarKey);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -33,11 +50,11 @@ function Layout() {
     `flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-colors ${
       isActive
         ? "bg-emerald-50 dark:bg-[#e8643a]/10 text-emerald-600 dark:text-[#e8643a] font-semibold"
-        : "text-gray-600 dark:text-[#a0a0a0] font-medium hover:bg-gray-50 dark:hover:bg-[#222] hover:text-gray-900 dark:hover:text-white"
+        : "text-gray-600 dark:text-[#a0a0a0] font-medium hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] hover:text-gray-900 dark:hover:text-white"
     }`;
 
   return (
-    <div className="flex min-h-screen bg-white dark:bg-[#0f0f0f] font-[Inter]">
+    <div className="flex min-h-screen bg-white dark:bg-[var(--bg-page)] font-[Inter]">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -49,14 +66,14 @@ function Layout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static z-50 flex flex-col w-64 min-h-screen bg-white dark:bg-[#1a1a1a] border-r border-gray-300 dark:border-[#2a2a2a] px-4 py-6 transform transition-transform lg:transform-none ${
+        className={`fixed lg:static z-50 flex flex-col w-64 min-h-screen bg-white dark:bg-[var(--bg-surface)] border-r border-gray-300 dark:border-[var(--bd)] px-4 py-6 transform transition-transform lg:transform-none ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0`}
       >
         {/* Mobile close button */}
         <button
           onClick={closeSidebar}
-          className="lg:hidden absolute top-3 right-3 p-1.5 rounded-md text-gray-500 dark:text-[#a0a0a0] hover:bg-gray-100 dark:hover:bg-[#222]"
+          className="lg:hidden absolute top-3 right-3 p-1.5 rounded-md text-gray-500 dark:text-[#a0a0a0] hover:bg-gray-100 dark:hover:bg-[var(--bg-hover)]"
           aria-label="Close menu"
         >
           <X className="w-5 h-5" />
@@ -64,7 +81,7 @@ function Layout() {
 
         <h1 className="flex items-center gap-2 whitespace-nowrap text-gray-900 dark:text-white font-bold text-base tracking-tight px-2 mb-8">
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 dark:bg-[#e8643a] shrink-0" />
-          Smart Finance Tracker
+          {t("common.appName")}
         </h1>
 
         <nav className="flex-1" onClick={closeSidebar}>
@@ -72,43 +89,40 @@ function Layout() {
             <li>
               <NavLink to="/dashboard" className={navLinkClass}>
                 <LayoutDashboard className="w-4 h-4 shrink-0" />
-                Dashboard
+                {t("sidebar.dashboard")}
               </NavLink>
             </li>
             <li>
               <NavLink to="/transactions" className={navLinkClass}>
                 <ArrowLeftRight className="w-4 h-4 shrink-0" />
-                Transaction
+                {t("sidebar.transactions")}
               </NavLink>
             </li>
             <li>
               <NavLink to="/budget" className={navLinkClass}>
                 <Wallet className="w-4 h-4 shrink-0" />
-                Budget
+                {t("sidebar.budget")}
               </NavLink>
             </li>
             <li>
               <NavLink to="/goals" className={navLinkClass}>
                 <Target className="w-4 h-4 shrink-0" />
-                Goals
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/charts" className={navLinkClass}>
-                <BarChart2 className="w-4 h-4 shrink-0" />
-                Chart
+                {t("sidebar.goals")}
               </NavLink>
             </li>
             <li>
               <NavLink to="/advisor" className={navLinkClass}>
                 <Lightbulb className="w-4 h-4 shrink-0" />
-                Advice
+                {t("sidebar.advisor")}
               </NavLink>
             </li>
           </ul>
         </nav>
 
-        <div className="border-t border-gray-300 dark:border-[#2a2a2a] pt-4 mt-4">
+        <div className="border-t border-gray-300 dark:border-[var(--bd)] pt-4 mt-4">
+          <p className="text-sm font-bold text-gray-900 dark:text-white px-2 truncate">
+            {username}
+          </p>
           <p className="text-gray-500 dark:text-[#a0a0a0] text-xs px-2 mb-2 truncate">
             {user?.email}
           </p>
@@ -116,7 +130,7 @@ function Layout() {
             <li>
               <NavLink to="/settings" className={navLinkClass}>
                 <SettingsIcon className="w-4 h-4 shrink-0" />
-                Settings
+                {t("sidebar.settings")}
               </NavLink>
             </li>
           </ul>
@@ -125,32 +139,65 @@ function Layout() {
             className="flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-xs font-medium text-[#ef4444] hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
           >
             <LogOut className="w-3.5 h-3.5 shrink-0" />
-            Sign out
+            {t("sidebar.signOut")}
           </button>
         </div>
       </aside>
 
       {/* Main */}
-      <main className="flex-1 min-w-0 bg-white dark:bg-[#0f0f0f]">
-        {/* Mobile top bar */}
-        <div className="lg:hidden sticky top-0 z-30 bg-white dark:bg-[#0f0f0f] border-b border-gray-300 dark:border-[#2a2a2a] px-4 py-3 flex items-center gap-3">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="p-1.5 rounded-md text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-[#222]"
-            aria-label="Open menu"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-          <span className="flex items-center gap-2 text-gray-900 dark:text-white font-semibold text-sm">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 dark:bg-[#e8643a]" />
-            Smart Finance Tracker
-          </span>
-        </div>
+      <main className="flex-1 min-w-0 bg-white dark:bg-[var(--bg-page)]">
+        {showSidebar ? (
+          /* Global top bar (Dashboard / Transactions / Budget / Goals) */
+          <div className="sticky top-0 z-30 bg-white dark:bg-[var(--bg-surface)] border-b border-gray-200 dark:border-[var(--bd)] h-[52px] px-4 lg:px-8 flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-1.5 rounded-md text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-[var(--bg-hover)]"
+              aria-label="Open menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <h2 className="text-[15px] font-semibold text-gray-900 dark:text-white tracking-tight">
+              {t(sidebarKey)}
+            </h2>
+            <div className="ml-auto flex items-center">
+              <button
+                type="button"
+                onClick={() => setNotifOpen(true)}
+                className="relative p-2 rounded-md text-gray-600 dark:text-[#a0a0a0] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[var(--bg-hover)] transition-colors"
+                aria-label={t("topbar.notifications")}
+              >
+                <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none tabular-nums">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Mobile-only fallback for pages without the global top bar */
+          <div className="lg:hidden sticky top-0 z-30 bg-white dark:bg-[var(--bg-page)] border-b border-gray-300 dark:border-[var(--bd)] px-4 py-3 flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-1.5 rounded-md text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-[var(--bg-hover)]"
+              aria-label="Open menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <span className="flex items-center gap-2 text-gray-900 dark:text-white font-semibold text-sm">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 dark:bg-[#e8643a]" />
+              Smart Finance Tracker
+            </span>
+          </div>
+        )}
 
         <div className="p-4 lg:p-8">
           <Outlet />
         </div>
       </main>
+
+      <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
     </div>
   );
 }

@@ -1,5 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-import { Pencil, Trash2, Plus, Target, Loader2 } from "lucide-react";
+import {
+  Pencil,
+  Trash2,
+  Plus,
+  Target,
+  Loader2,
+  RotateCcw,
+  MoreVertical,
+} from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { formatCurrency, fetchBaseCurrency } from "../lib/utils";
@@ -12,30 +21,58 @@ type GoalFieldErrors = {
   deadline?: string;
 };
 
+const NO_DECIMAL_CURRENCIES = new Set([
+  "VND",
+  "JPY",
+  "KRW",
+  "IDR",
+  "HUF",
+  "CLP",
+  "TWD",
+]);
+
+function roundForCurrency(amount: number, currency: string): number {
+  return NO_DECIMAL_CURRENCIES.has(currency.toUpperCase())
+    ? Math.round(amount)
+    : Math.round(amount * 100) / 100;
+}
+
 function Goals() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const toast = useToast();
   const [goals, setGoals] = useState<any[]>([]);
   const [editId, setEditId] = useState<number | null>(null);
-  //form field
+  // Form fields
   const [name, setName] = useState("");
   const [target_amount, setTargetAmount] = useState("");
   const [current_amount, setCurrentAmount] = useState("");
   const [deadline, setDeadline] = useState("");
-  const [progressInput, setProgressInput] = useState({});
+  // Card-level state
+  const [progressInput, setProgressInput] = useState<Record<number, string>>(
+    {},
+  );
+  const [previousAmounts, setPreviousAmounts] = useState<
+    Record<number, number>
+  >({});
   const [baseCurrency, setBaseCurrency] = useState<string>("USD");
   const [submitting, setSubmitting] = useState(false);
   const [progressSubmittingId, setProgressSubmittingId] = useState<
     number | null
   >(null);
+  const [quickAddSubmittingId, setQuickAddSubmittingId] = useState<
+    number | null
+  >(null);
+  const [undoSubmittingId, setUndoSubmittingId] = useState<number | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<GoalFieldErrors>({});
   const [loading, setLoading] = useState(true);
+
   const initPage = useCallback(async () => {
     try {
       const currency = await fetchBaseCurrency();
       setBaseCurrency(currency);
-
       const goalsResponse = await apiFetch(
         `http://localhost:8000/goals/?base_currency=${currency}`,
       );
@@ -47,11 +84,27 @@ function Goals() {
       setLoading(false);
     }
   }, [user?.id]);
+
   useEffect(() => {
     initPage();
   }, [initPage]);
+
+  // Converts a base-currency amount into the goal's storage currency for PUT.
+  async function resolveNewStored(goal: any, newBase: number): Promise<number> {
+    const goalCurrency = goal.currency || "USD";
+    if (goalCurrency === baseCurrency) return newBase;
+    const ratesRes = await apiFetch(
+      `http://localhost:8000/currency/rates?base=${baseCurrency}`,
+    );
+    const ratesData = await ratesRes.json();
+    const rates = ratesData.rates || {};
+    const baseRate = rates[baseCurrency] ?? 1;
+    const goalRate = rates[goalCurrency];
+    if (!goalRate) return newBase;
+    return (newBase / baseRate) * goalRate;
+  }
+
   async function handleSubmit() {
-    // Inline validation
     const errs: GoalFieldErrors = {};
     if (!name.trim()) errs.name = "Name is required";
     const target = Number(target_amount);
@@ -81,7 +134,7 @@ function Goals() {
             currency: baseCurrency,
           }),
         });
-        toast.success("Goal added");
+        toast.success(t("goals.toastAdded"));
       } else {
         await apiFetch(`http://localhost:8000/goals/${editId}`, {
           method: "PUT",
@@ -95,7 +148,7 @@ function Goals() {
             currency: baseCurrency,
           }),
         });
-        toast.success("Goal updated");
+        toast.success(t("goals.toastUpdated"));
       }
       initPage();
       setEditId(null);
@@ -110,13 +163,16 @@ function Goals() {
       setSubmitting(false);
     }
   }
-  function handleEdit(goal) {
+
+  function handleEdit(goal: any) {
     setEditId(goal.id);
     setName(goal.name);
     setCurrentAmount(String(goal.current_amount));
     setTargetAmount(String(goal.target_amount));
     setDeadline(goal.deadline?.split("T")[0] || "");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
   function handleCancelEdit() {
     setEditId(null);
     setName("");
@@ -124,17 +180,17 @@ function Goals() {
     setCurrentAmount("");
     setDeadline("");
   }
-  async function handleDelete(id) {
+
+  async function handleDelete(id: number) {
     try {
-      await apiFetch(`http://localhost:8000/goals/${id}`, {
-        method: "DELETE",
-      });
+      await apiFetch(`http://localhost:8000/goals/${id}`, { method: "DELETE" });
       initPage();
     } catch (err: any) {
       setError(err.message);
     }
   }
-  async function handleAddProgress(goal) {
+
+  async function handleAddProgress(goal: any) {
     const added = parseFloat(progressInput[goal.id] || "0");
     if (!added || added <= 0) {
       toast.error("Enter an amount greater than zero");
@@ -142,32 +198,8 @@ function Goals() {
     }
     setProgressSubmittingId(goal.id);
     try {
-      const goalCurrency = goal.currency || "USD";
-      // current_amount the frontend sees is already converted to baseCurrency.
-      // We need to send the new STORED value (in goalCurrency) back.
-      let newStored: number;
-      if (goalCurrency === baseCurrency) {
-        newStored = Number(goal.current_amount || 0) + added;
-      } else {
-        const ratesRes = await apiFetch(
-          `http://localhost:8000/currency/rates?base=${baseCurrency}`,
-        );
-        const ratesData = await ratesRes.json();
-        const rates = ratesData.rates || {};
-        const baseRate = rates[baseCurrency];
-        const goalRate = rates[goalCurrency];
-        if (!baseRate || !goalRate) {
-          // Rates unavailable — fall back to plain addition (no conversion)
-          newStored = Number(goal.current_amount || 0) + added;
-        } else {
-          // Convert displayed total back to goal's stored currency:
-          //   stored = displayed / rates[base] * rates[goal]
-          newStored =
-            (((Number(goal.current_amount) || 0) + added) / baseRate) *
-            goalRate;
-        }
-      }
-
+      const newBase = (goal.current_amount ?? 0) + added;
+      const newStored = await resolveNewStored(goal, newBase);
       await apiFetch(`http://localhost:8000/goals/${goal.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -176,55 +208,91 @@ function Goals() {
       toast.success(
         `Added ${formatCurrency(added, baseCurrency)} to ${goal.name}`,
       );
+      setPreviousAmounts((prev) => ({
+        ...prev,
+        [goal.id]: goal.current_amount ?? 0,
+      }));
       initPage();
-      setProgressInput({ ...progressInput, [goal.id]: "" });
+      setProgressInput((prev) => ({ ...prev, [goal.id]: "" }));
     } catch (err: any) {
-      setError(err.message);
+      toast.error(err.message || "Failed to update goal");
     } finally {
       setProgressSubmittingId(null);
     }
   }
 
-  const inputClass =
-    "border border-gray-300 dark:border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#666] bg-white dark:bg-[#0f0f0f] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/40 focus:border-emerald-500 dark:focus:border-[#e8643a]";
+  async function handleQuickAdd(goal: any, pct: number) {
+    const delta = roundForCurrency(
+      (goal.target_amount * pct) / 100,
+      baseCurrency,
+    );
+    const newBase = Math.max(0, (goal.current_amount ?? 0) + delta);
+    setQuickAddSubmittingId(goal.id);
+    try {
+      const newStored = await resolveNewStored(goal, newBase);
+      await apiFetch(`http://localhost:8000/goals/${goal.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ current_amount: newStored }),
+      });
+      const sign = pct > 0 ? "+" : "";
+      toast.success(`${sign}${pct}% applied to ${goal.name}`);
+      setPreviousAmounts((prev) => ({
+        ...prev,
+        [goal.id]: goal.current_amount ?? 0,
+      }));
+      initPage();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update goal");
+    } finally {
+      setQuickAddSubmittingId(null);
+    }
+  }
+
+  async function handleUndoProgress(goal: any) {
+    const prevBase = previousAmounts[goal.id];
+    if (prevBase === undefined) return;
+    setUndoSubmittingId(goal.id);
+    try {
+      const prevStored = await resolveNewStored(goal, prevBase);
+      await apiFetch(`http://localhost:8000/goals/${goal.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ current_amount: prevStored }),
+      });
+      toast.success(`Reverted progress for ${goal.name}`);
+      setPreviousAmounts((prev) => {
+        const next = { ...prev };
+        delete next[goal.id];
+        return next;
+      });
+      initPage();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setUndoSubmittingId(null);
+    }
+  }
 
   const Divider = () => (
-    <div className="w-px bg-gray-300 dark:bg-[#2a2a2a] self-stretch my-2 shrink-0" />
+    <div className="hidden sm:block w-px bg-gray-300 dark:bg-[var(--bd)] self-stretch my-2 shrink-0" />
   );
 
   const hasFieldError = fieldErrors.name || fieldErrors.target_amount;
+
   if (loading) {
     return (
       <div className="font-[Inter] animate-pulse">
         <div className="mb-6 lg:mb-8">
-          <div className="h-8 w-32 bg-gray-200 dark:bg-[#222] rounded mb-2" />
-          <div className="h-4 w-48 bg-gray-200 dark:bg-[#222] rounded" />
+          <div className="h-8 w-32 bg-gray-200 dark:bg-[var(--bg-muted)] rounded mb-2" />
+          <div className="h-4 w-48 bg-gray-200 dark:bg-[var(--bg-muted)] rounded" />
         </div>
-        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-32" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white dark:bg-[var(--bg-surface)] rounded-xl border border-gray-300 dark:border-[var(--bd)] shadow-sm p-6 mb-6 h-16" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
           {[0, 1, 2, 3].map((i) => (
             <div
               key={i}
-              className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-5 h-32"
-            />
-          ))}
-        </div>
-      </div>
-    );
-  }
-  if (loading) {
-    return (
-      <div className="font-[Inter] animate-pulse">
-        <div className="mb-6 lg:mb-8">
-          <div className="h-8 w-24 bg-gray-200 dark:bg-[#222] rounded mb-2" />
-          <div className="h-4 w-44 bg-gray-200 dark:bg-[#222] rounded" />
-        </div>
-        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-32" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[0, 1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-5 h-44"
+              className="bg-white dark:bg-[var(--bg-surface)] rounded-xl border border-gray-200 dark:border-[var(--bd)] shadow-sm p-4 h-36"
             />
           ))}
         </div>
@@ -233,14 +301,11 @@ function Goals() {
   }
 
   return (
-    <div className="font-[Inter]">
-      {/* Page header */}
+    <div className="font-[Inter] overflow-x-hidden">
+      {/* Page subtitle */}
       <header className="mb-6 lg:mb-8">
-        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
-          Goals
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-[#a0a0a0] mt-1">
-          Track your financial goals
+        <p className="text-sm text-gray-500 dark:text-[#a0a0a0]">
+          {t("goals.subtitle")}
         </p>
       </header>
 
@@ -248,98 +313,94 @@ function Goals() {
         <ErrorBanner message={error} onDismiss={() => setError(null)} />
       )}
 
-      {/*Unified input bar  */}
+      {/* ── SECTION HEADING ── */}
+      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#a0a0a0] mb-2">
+        {t("goals.sectionGoal")}
+      </p>
+
+      {/* ── UNIFIED INPUT BAR ── */}
       <div className="mt-1">
         <div
           className={`
-            flex items-center
-            gap-6 px-2
-            border border-gray-300 dark:border-[#2a2a2a]
+            flex flex-col sm:flex-row items-stretch sm:items-center
+            border border-gray-300 dark:border-[var(--bd)]
             rounded-xl overflow-visible
-            bg-white dark:bg-[#0f0f0f]
-            shadow-sm
-            transition-all duration-150 ${hasFieldError ? "border-red-400 dark:border-red-500/60 ring-1 ring-red-400/30 dark:ring-red-500/20" : ""}`}
+            bg-white dark:bg-[var(--bg-surface)]
+            shadow-sm transition-all duration-150
+            ${hasFieldError ? "border-red-400 dark:border-red-500/60 ring-1 ring-red-400/30 dark:ring-red-500/20" : ""}
+          `}
         >
-          {/* goal input */}
-          <input
-            type="text"
-            placeholder="Goal name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className={`
-              flex-1 min-w-45 shrink-0 px-3.5 py-2.5 text-sm
-              bg-transparent border-none outline-none
-              text-gray-900 dark:text-white
-              placeholder-gray-400 dark:placeholder-[#555]
-              [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
-            ${
-              name
-                ? "text-gray-900 dark:text-white"
-                : fieldErrors.name
-                  ? "text-red-400"
-                  : "text-gray-400 dark:text-[#555]"
-            }`}
-          />
+          {/* ─── ROW 1: Goal name · Target amount ─── */}
+          <div className="flex flex-col items-center sm:flex-row sm:items-center flex-1 min-w-0">
+            <input
+              type="text"
+              placeholder={t("goals.goalNamePlaceholder")}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={`
+                w-full sm:flex-1 min-w-0 px-3.5 py-2.5 text-sm
+                bg-transparent border-none outline-none
+                ${name ? "text-gray-900 dark:text-white" : fieldErrors.name ? "text-red-400" : "text-gray-400 dark:text-[#555]"}
+              `}
+            />
+            <Divider />
+            <input
+              type="number"
+              placeholder={t("goals.targetAmountPlaceholder")}
+              value={target_amount}
+              onChange={(e) => setTargetAmount(e.target.value)}
+              className={`
+                w-full sm:w-40 shrink-0 px-3.5 py-2.5 text-sm
+                bg-transparent border-none outline-none
+                [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
+                ${target_amount ? "text-gray-900 dark:text-white" : fieldErrors.target_amount ? "text-red-400" : "text-gray-400 dark:text-[#555]"}
+              `}
+            />
+          </div>
 
-          <Divider />
-          <input
-            type="number"
-            placeholder="Target amount"
-            value={target_amount}
-            onChange={(e) => setTargetAmount(e.target.value)}
-            className={`
-              min-w-24 shrink-0 px-3.5 py-2.5 text-sm
-              bg-transparent border-none outline-none
-              text-gray-900 dark:text-white
-              placeholder-gray-400 dark:placeholder-[#555]
-              [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
-            ${
-              target_amount
-                ? "text-gray-900 dark:text-white"
-                : fieldErrors.target_amount
-                  ? "text-red-400"
-                  : "text-gray-400 dark:text-[#555]"
-            }`}
-          />
-          <Divider />
-          <div>
+          {/* ─── Cross-row separator ─── */}
+          <div className="sm:hidden h-px bg-gray-300 dark:bg-[var(--bd)]" />
+          <div className="hidden sm:block w-px bg-gray-300 dark:bg-[var(--bd)] self-stretch my-2 shrink-0" />
+
+          {/* ─── ROW 2: Deadline · Actions ─── */}
+          <div className="flex flex-col items-center sm:flex-row sm:items-center">
             <input
               type="date"
               value={deadline}
               onChange={(e) => setDeadline(e.target.value)}
-              className="w-36 shrink-0 px-3 py-2.5 text-sm bg-transparent border-none outline-none text-gray-900 dark:text-white dark:[color-scheme:dark]"
+              className="w-full sm:w-36 shrink-0 px-3 py-2.5 text-sm bg-transparent border-none outline-none text-gray-900 dark:text-white dark:[color-scheme:dark]"
             />
-          </div>
-
-          <Divider />
-
-          <div className="flex gap-2">
+            <Divider />
             {editId !== null && (
               <button
                 type="button"
                 onClick={handleCancelEdit}
-                className="mr-1 px-3 py-1.5 rounded-lg text-sm font-semibold text-gray-600 dark:text-[#aaa] hover:bg-gray-100 dark:hover:bg-[#222] transition-colors"
+                className="hidden sm:block mr-1 px-3 py-1.5 rounded-lg text-sm font-semibold text-gray-600 dark:text-[#aaa] hover:bg-gray-100 dark:hover:bg-[var(--bg-hover)] transition-colors"
               >
-                Cancel
+                {t("common.cancel")}
               </button>
             )}
             <button
-              onClick={() => handleSubmit()}
+              onClick={handleSubmit}
               disabled={submitting}
-              className="flex items-center gap-1.5 p-l mr-3.5 px-4 py-1.5 rounded-lg bg-transparent text-gray-600 text-sm font-semibold hover:text-white hover:bg-emerald-600 dark:hover:bg-[#d2552d] dark:text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+              className="flex items-center justify-center gap-1.5 w-[calc(100%-1.5rem)] sm:w-auto mx-3 mb-3 mt-3 sm:mt-0 sm:mx-0 sm:mb-0 sm:mr-3.5 px-4 py-2.5 sm:py-1.5 rounded-lg bg-emerald-500 sm:bg-transparent dark:bg-[#e8643a] sm:dark:bg-transparent text-white hover:text-white sm:text-gray-600 sm:dark:text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
             >
-              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              {submitting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
               {submitting
                 ? editId
-                  ? "Updating..."
-                  : "Adding..."
+                  ? t("goals.updatingBtn")
+                  : t("goals.addingBtn")
                 : editId
-                  ? "Update Goal"
-                  : "Add Goal"}
+                  ? t("goals.updateGoalBtn")
+                  : t("goals.addGoalBtn")}
             </button>
           </div>
         </div>
-        {/* Inline validation message */}
+
         {hasFieldError && (
           <p className="mt-1.5 ml-1 text-xs text-red-500 dark:text-red-400">
             {[fieldErrors.name, fieldErrors.target_amount]
@@ -349,116 +410,240 @@ function Goals() {
         )}
       </div>
 
-      {/* Goals grid */}
-      {goals.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
-          {goals.map((goal) => {
-            const percentage =
-              goal.target_amount > 0
-                ? (goal.current_amount / goal.target_amount) * 100
-                : 0;
-            const deadlineLabel = goal.deadline
-              ? new Date(goal.deadline).toLocaleDateString()
-              : "No deadline";
-            return (
-              <div
-                key={goal.id}
-                className="relative bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-5"
-              >
-                {/* Top right actions */}
-                <div className="absolute top-3 right-3 flex gap-1">
-                  <button
-                    onClick={() => handleEdit(goal)}
-                    className="p-1.5 rounded-md text-gray-400 dark:text-[#666] hover:text-gray-700 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#222] transition-colors"
-                    aria-label="Edit goal"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(goal.id)}
-                    className="p-1.5 rounded-md text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                    aria-label="Delete goal"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+      {/* ── SECTION HEADING ── */}
+      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#a0a0a0] mt-5 mb-2">
+        {t("goals.sectionYourGoals")}
+      </p>
 
-                {/* Header */}
-                <div className="flex items-center gap-2 mb-4 pr-16 flex-wrap">
-                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
-                    {goal.name}
-                  </h3>
-                  <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#2a2a2a] text-xs font-medium text-gray-600 dark:text-[#a0a0a0]">
-                    {deadlineLabel}
-                  </span>
-                </div>
+      {/* ── GOAL CARDS (scrollable) ── */}
+      <div
+        className="overflow-auto thin-scrollbar"
+        style={{ maxHeight: "calc(100vh - 360px)", minHeight: "200px" }}
+      >
+        {goals.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-1">
+            {goals.map((goal) => {
+              const pct =
+                goal.target_amount > 0
+                  ? (goal.current_amount / goal.target_amount) * 100
+                  : 0;
+              const pctClamped = Math.min(pct, 100);
+              const isComplete = pct >= 100;
+              const deadlineLabel = goal.deadline
+                ? goal.deadline.split("T")[0]
+                : t("goals.noDeadline");
+              const anySubmitting =
+                progressSubmittingId === goal.id ||
+                quickAddSubmittingId === goal.id;
 
-                {/* Progress bar */}
-                <div className="w-full h-2.5 bg-gray-100 dark:bg-[#2a2a2a] rounded-full overflow-hidden mb-2">
-                  <div
-                    className="bg-emerald-500 dark:bg-[#e8643a] h-full rounded-full transition-all"
-                    style={{ width: `${Math.min(percentage, 100)}%` }}
-                  />
-                </div>
+              return (
+                <div
+                  key={goal.id}
+                  className="bg-white dark:bg-[var(--bg-surface)] rounded-xl border border-gray-200 dark:border-[var(--bd)] shadow-sm p-4"
+                >
+                  {/* ── TOP SECTION ── */}
+                  <div className="flex items-start gap-2.5">
+                    {/* Icon */}
+                    <div className="w-9 h-9 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center mt-0.5">
+                      <span role="img" aria-label="bullseye">
+                        🎯
+                      </span>
+                    </div>
 
-                {/* Current / target + percentage */}
-                <div className="flex items-baseline justify-between text-sm mb-4">
-                  <span className="text-gray-600 dark:text-[#a0a0a0]">
-                    <span className="font-semibold text-gray-900 dark:text-white">
-                      {formatCurrency(goal.current_amount, baseCurrency)}
-                    </span>{" "}
-                    / {formatCurrency(goal.target_amount, baseCurrency)}
-                  </span>
-                  <span className="font-semibold text-gray-700 dark:text-[#e0e0e0]">
-                    {percentage.toFixed(1)}%
-                  </span>
-                </div>
+                    {/* Name block */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        {/* Left: name + deadline + mobile amounts */}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-bold text-gray-900 dark:text-white truncate leading-snug">
+                            {goal.name}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-[#a0a0a0] mt-0.5">
+                            {t("goals.deadlineLabel")} · {deadlineLabel}
+                          </p>
+                          {/* Mobile: percentage + amounts shown inline below deadline */}
+                          <div className="sm:hidden flex items-baseline gap-2 mt-1.5 flex-wrap">
+                            <span
+                              className={`text-base font-bold ${isComplete ? "text-emerald-600 dark:text-emerald-400" : "text-gray-900 dark:text-white"}`}
+                            >
+                              {Math.round(pct)}%
+                            </span>
+                            <span className="text-xs text-gray-500 dark:text-[#a0a0a0] tabular-nums">
+                              {formatCurrency(
+                                goal.current_amount,
+                                baseCurrency,
+                              )}{" "}
+                              /{" "}
+                              {formatCurrency(goal.target_amount, baseCurrency)}
+                            </span>
+                          </div>
+                        </div>
 
-                {/* Add progress */}
-                <div className="flex gap-2 pt-3 border-t border-gray-100 dark:border-[#222]">
-                  <input
-                    type="number"
-                    placeholder="Add amount"
-                    value={progressInput[goal.id] ?? ""}
-                    onChange={(e) =>
-                      setProgressInput({
-                        ...progressInput,
-                        [goal.id]: e.target.value,
-                      })
-                    }
-                    className={`${inputClass} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none flex-1`}
-                  />
-                  <button
-                    onClick={() => handleAddProgress(goal)}
-                    disabled={progressSubmittingId === goal.id}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {progressSubmittingId === goal.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Plus className="w-4 h-4" />
-                    )}
-                    Add
-                  </button>
+                        {/* Right: desktop percentage + amounts + three-dot menu */}
+                        <div className="flex items-start gap-1.5 shrink-0">
+                          {/* Desktop: percentage + amounts */}
+                          <div className="hidden sm:block text-right">
+                            <p
+                              className={`text-base font-bold leading-snug ${isComplete ? "text-emerald-600 dark:text-emerald-400" : "text-gray-900 dark:text-white"}`}
+                            >
+                              {Math.round(pct)}%
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-[#a0a0a0] tabular-nums mt-0.5">
+                              {formatCurrency(
+                                goal.current_amount,
+                                baseCurrency,
+                              )}{" "}
+                              /{" "}
+                              {formatCurrency(goal.target_amount, baseCurrency)}
+                            </p>
+                          </div>
+
+                          {/* Three-dot dropdown */}
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOpenMenuId(
+                                  openMenuId === goal.id ? null : goal.id,
+                                )
+                              }
+                              className="p-1 rounded-md text-gray-400 dark:text-[#666] hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[var(--bg-hover)] transition-colors"
+                              aria-label="Goal options"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+
+                            {openMenuId === goal.id && (
+                              <>
+                                <div
+                                  className="fixed inset-0 z-40"
+                                  onClick={() => setOpenMenuId(null)}
+                                />
+                                <div className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-[var(--bg-surface)] border border-gray-200 dark:border-[var(--bd)] rounded-xl shadow-lg z-50 overflow-hidden py-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleEdit(goal);
+                                      setOpenMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-[#e0e0e0] hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] transition-colors text-left"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                    {t("goals.menuEdit")}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleDelete(goal.id);
+                                      setOpenMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors text-left"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    {t("goals.menuDelete")}
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── PROGRESS BAR ── */}
+                  <div className="mt-3 w-full h-1.5 bg-gray-100 dark:bg-[var(--bg-muted)] rounded-full overflow-hidden">
+                    <div
+                      className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                      style={{ width: `${pctClamped}%` }}
+                    />
+                  </div>
+
+                  {/* ── BOTTOM SECTION: amount input + quick-add buttons ── */}
+                  <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
+                    {/* Custom amount input */}
+                    <div className="flex gap-1.5 flex-1 min-w-0">
+                      <input
+                        type="number"
+                        placeholder={t("goals.addAmountPlaceholder")}
+                        min="0"
+                        value={progressInput[goal.id] ?? ""}
+                        onChange={(e) =>
+                          setProgressInput((prev) => ({
+                            ...prev,
+                            [goal.id]: e.target.value,
+                          }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleAddProgress(goal);
+                        }}
+                        className="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-[var(--bd)] bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <button
+                        onClick={() => handleAddProgress(goal)}
+                        disabled={anySubmitting}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-xs font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+                      >
+                        {progressSubmittingId === goal.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Plus className="w-3.5 h-3.5" />
+                        )}
+                        {t("goals.addBtn")}
+                      </button>
+                    </div>
+
+                    {/* Percentage quick-add buttons */}
+                    <div className="flex gap-1.5">
+                      {([-1, 1, 5] as const).map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => handleQuickAdd(goal, p)}
+                          disabled={anySubmitting}
+                          className="flex-1 sm:flex-none px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-[var(--bd)] text-xs font-medium text-gray-600 dark:text-[#e0e0e0] hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        >
+                          {p > 0 ? `+${p}%` : `${p}%`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Undo last addition */}
+                  {previousAmounts[goal.id] !== undefined && (
+                    <button
+                      onClick={() => handleUndoProgress(goal)}
+                      disabled={undoSubmittingId === goal.id}
+                      className="mt-2 flex items-center gap-1 text-xs text-gray-400 dark:text-[#666] hover:text-gray-600 dark:hover:text-[#a0a0a0] transition-colors disabled:opacity-50"
+                    >
+                      {undoSubmittingId === goal.id ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <RotateCcw className="w-3 h-3" />
+                      )}
+                      {t("goals.undoLastAddition")}
+                    </button>
+                  )}
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="bg-white mt-5 dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-12 flex flex-col items-center text-center">
-          <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-[#e8643a]/10 flex items-center justify-center mb-3">
-            <Target className="w-6 h-6 text-emerald-600 dark:text-[#e8643a]" />
+              );
+            })}
           </div>
-          <p className="text-base font-semibold text-gray-900 dark:text-white mb-1">
-            No goals yet
-          </p>
-          <p className="text-sm text-gray-500 dark:text-[#a0a0a0]">
-            Add your first goal above to start tracking progress.
-          </p>
-        </div>
-      )}
+        ) : (
+          <div className="bg-white dark:bg-[var(--bg-surface)] rounded-xl border border-gray-300 dark:border-[var(--bd)] shadow-sm p-12 flex flex-col items-center text-center">
+            <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-[#e8643a]/10 flex items-center justify-center mb-3">
+              <Target className="w-6 h-6 text-emerald-600 dark:text-[#e8643a]" />
+            </div>
+            <p className="text-base font-semibold text-gray-900 dark:text-white mb-1">
+              {t("goals.noGoalsTitle")}
+            </p>
+            <p className="text-sm text-gray-500 dark:text-[#a0a0a0]">
+              {t("goals.noGoalsDesc")}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
 export default Goals;

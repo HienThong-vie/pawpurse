@@ -10,11 +10,11 @@ from datetime import date,time,datetime,timezone
 from datetime import timedelta
 from core.currency import get_exchange_rates,convert_amount
 from core.auth import get_current_user
-
 router = APIRouter (
     prefix="/budgets",
     tags=["budgets"]
 )
+
 
 @router.post("/",response_model=BudgetResponse)
 def create_budget(data: BudgetCreate, db: Session = Depends(get_db)):
@@ -39,16 +39,29 @@ async def get_budget(user_id: str = Depends(get_current_user), base_currency: st
     result = []  
     for budget in budgets:
         today = date.today()
-        if budget.period == "week":
+        if budget.period in ("day", "daily"):
+            period_start = today
+            period_end = today + timedelta(days=1)
+        elif budget.period in ("week", "weekly"):
             period_start = today - timedelta(days=today.weekday())
-        elif budget.period == "month":
+            period_end = period_start + timedelta(days=7)
+        elif budget.period in ("month", "monthly"):
             period_start = today.replace(day=1)
+            if period_start.month == 12:
+                period_end = period_start.replace(year=period_start.year + 1, month=1)
+            else:
+                period_end = period_start.replace(month=period_start.month + 1)
+        else:
+            period_start = today
+            period_end = today + timedelta(days=1)
         period_start_dt = datetime.combine(period_start, time.min, tzinfo=timezone.utc)
+        period_end_dt = datetime.combine(period_end, time.min, tzinfo=timezone.utc)
         transactions = db.query(Transaction).filter(
             Transaction.user_id == user_id,
             Transaction.category == budget.category,
             Transaction.type == "expense",
             Transaction.date >= period_start_dt,
+            Transaction.date < period_end_dt,
         ).all()
         # Normalize legacy naive datetimes to UTC
         for t in transactions:
@@ -80,7 +93,9 @@ async def get_budget(user_id: str = Depends(get_current_user), base_currency: st
         currency= base_currency,
         status = status,
         spent = spent,
-        percentage = percentage
+        percentage = percentage,
+        period_start = period_start,
+        period_end = period_end,
         ))
     return result
 

@@ -1,6 +1,22 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ── Dark mode palette ──────────────────────────────────────────────
+   Edit these variables to retheme dark mode globally.
+   --bg-page    : main page / shell background
+   --bg-surface : cards, input bars, panels (one step lighter than page)
+   --bg-muted   : table headers, progress tracks, badge chips
+   --bg-hover   : interactive hover states
+   --bd         : all borders and dividers
+   ─────────────────────────────────────────────────────────────────── */
+.dark {
+  --bg-page: #1a1a1a;
+  --bg-surface: #252525;
+  --bg-muted: #2a2a2a;
+  --bg-hover: #2e2e2e;
+  --bd: #333333;
+}
+
 /* Subtle scrollbar that blends with card surfaces */
 .thin-scrollbar {
   scrollbar-width: thin;
@@ -29,15 +45,15 @@
 }
 
 .dark .thin-scrollbar {
-  scrollbar-color: #2a2a2a transparent;
+  scrollbar-color: #333333 transparent;
 }
 .dark .thin-scrollbar::-webkit-scrollbar-thumb {
-  background: #2a2a2a;
+  background: #333333;
   background-clip: padding-box;
   border: 2px solid transparent;
 }
 .dark .thin-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #3a3a3a;
+  background: #3e3e3e;
   background-clip: padding-box;
   border: 2px solid transparent;
 }

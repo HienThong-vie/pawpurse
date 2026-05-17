@@ -1,23 +1,15 @@
 import type { ReactNode } from "react";
-
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=2160&q=80";
+import FeatureCarousel from "../FeaturePreviews/FeatureCarousel";
 
 type AuthLayoutProps = {
   title: ReactNode;
   description: ReactNode;
   children: ReactNode;
-  rightOverlay?: ReactNode;
 };
 
-function AuthLayout({
-  title,
-  description,
-  children,
-  rightOverlay,
-}: AuthLayoutProps) {
+function AuthLayout({ title, description, children }: AuthLayoutProps) {
   return (
-    <div className="flex flex-col md:flex-row min-h-screen overflow-x-hidden font-[Inter] bg-white dark:bg-[#0f0f0f] text-gray-900 dark:text-white">
+    <div className="flex flex-col lg:flex-row min-h-screen overflow-x-hidden font-[Inter] bg-white dark:bg-[#0f0f0f] text-gray-900 dark:text-white">
       {/* Left: form column */}
       <section className="flex-1 flex items-center justify-center p-6 md:p-12">
         <div className="w-full max-w-md">
@@ -37,14 +29,12 @@ function AuthLayout({
         </div>
       </section>
 
-      {/* Right: hero column (desktop only) */}
-      <section className="hidden md:block flex-1 relative p-4">
-        <div
-          className="animate-slide-right animate-delay-300 absolute inset-4 rounded-3xl bg-cover bg-center"
-          style={{ backgroundImage: `url(${HERO_IMAGE})` }}
-        />
-        {rightOverlay}
-        <p className="absolute bottom-6 left-8 text-xs text-white/80">
+      {/* Right: carousel column (desktop only, ≥1024px) */}
+      <section className="hidden lg:flex flex-1 flex-col items-center justify-center px-16 py-12 bg-gray-50 dark:bg-[#161616] border-l border-gray-100 dark:border-[#1f1f1f]">
+        <div className="w-full max-w-md">
+          <FeatureCarousel />
+        </div>
+        <p className="mt-8 text-xs text-gray-400 dark:text-[#555]">
           © {new Date().getFullYear()} Smart Finance Tracker
         </p>
       </section>

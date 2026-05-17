@@ -1,55 +1,17 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { CheckCircle, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import supabase from "../lib/supabaseClient";
+import { useTranslation } from "react-i18next";
 import { useToast } from "../context/ToastContext";
 import AuthLayout from "../components/auth/AuthLayout";
 import GlassInput from "../components/auth/GlassInput";
 
 type Mode = "login" | "forgot" | "forgot-sent";
 
-const FEATURES = [
-  "Track income and expenses",
-  "Set and monitor budgets",
-  "Visualize spending patterns",
-  "Set financial goals",
-];
-
-const FEATURE_DELAYS = [
-  "animate-delay-500",
-  "animate-delay-600",
-  "animate-delay-700",
-  "animate-delay-800",
-];
-
-function FeatureCards() {
-  return (
-    <div className="absolute right-8 top-1/2 -translate-y-1/2 flex flex-col gap-3 w-64">
-      {FEATURES.map((feature, i) => (
-        <div
-          key={feature}
-          className={`animate-element ${FEATURE_DELAYS[i]} flex items-center gap-3 rounded-2xl bg-white/70 dark:bg-white/[0.05] backdrop-blur-xl border border-white/20 p-4 text-sm text-white`}
-        >
-          <CheckCircle className="w-5 h-5 shrink-0" />
-          <span className="font-medium">{feature}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const TITLES: Record<Mode, string> = {
-  login: "Welcome back",
-  forgot: "Reset your password",
-  "forgot-sent": "Check your email",
-};
-const DESCRIPTIONS: Record<Mode, string> = {
-  login: "Sign in to your account",
-  forgot: "Enter your email and we'll send you a reset link.",
-  "forgot-sent": "Check your email for a reset link.",
-};
 
 function Login() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
   const [email, setEmail] = useState<string>("");
@@ -58,6 +20,16 @@ function Login() {
   const [mode, setMode] = useState<Mode>("login");
   const [forgotSubmitting, setForgotSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const TITLES: Record<Mode, string> = {
+    login: t("auth.loginTitle"),
+    forgot: t("auth.forgotTitle"),
+    "forgot-sent": t("auth.forgotSentTitle"),
+  };
+  const DESCRIPTIONS: Record<Mode, string> = {
+    login: t("auth.loginDesc"),
+    forgot: t("auth.forgotDesc"),
+    "forgot-sent": t("auth.forgotSentDesc"),
+  };
 
   async function Logging() {
     setSubmitting(true);
@@ -78,7 +50,7 @@ function Login() {
 
   async function sendResetEmail() {
     if (!email) {
-      toast.error("Please enter your email");
+      toast.error(t("auth.errorEnterEmail"));
       return;
     }
     setForgotSubmitting(true);
@@ -100,20 +72,19 @@ function Login() {
     <AuthLayout
       title={TITLES[mode]}
       description={DESCRIPTIONS[mode]}
-      rightOverlay={<FeatureCards />}
     >
       {mode === "login" && (
         <div className="space-y-5">
           <GlassInput
-            label="Email"
+            label={t("auth.emailLabel")}
             type="email"
-            placeholder="you@example.com"
+            placeholder={t("auth.emailPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             leftIcon={<Mail className="w-4 h-4" />}
           />
           <GlassInput
-            label="Password"
+            label={t("auth.passwordLabel")}
             type={showPassword ? "text" : "password"}
             placeholder="••••••••"
             value={password}
@@ -140,7 +111,7 @@ function Login() {
             className="w-full rounded-2xl bg-emerald-500 dark:bg-[#e8643a] text-white py-4 text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-            {submitting ? "Signing in..." : "Sign in"}
+            {submitting ? t("auth.signingIn") : t("auth.signInBtn")}
           </button>
           <div className="flex justify-center">
             <button
@@ -148,16 +119,16 @@ function Login() {
               onClick={() => setMode("forgot")}
               className="text-sm font-semibold text-emerald-600 dark:text-[#e8643a] hover:underline"
             >
-              Forgot password?
+              {t("auth.forgotPassword")}
             </button>
           </div>
           <p className="text-sm text-gray-500 dark:text-[#a0a0a0] text-center">
-            Don't have an account?{" "}
+            {t("auth.noAccount")}{" "}
             <Link
               to="/signup"
               className="text-emerald-600 dark:text-[#e8643a] font-semibold hover:underline"
             >
-              Sign up
+              {t("auth.signUpLink")}
             </Link>
           </p>
         </div>
@@ -166,9 +137,9 @@ function Login() {
       {mode === "forgot" && (
         <div className="space-y-5">
           <GlassInput
-            label="Email"
+            label={t("auth.emailLabel")}
             type="email"
-            placeholder="you@example.com"
+            placeholder={t("auth.emailPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             leftIcon={<Mail className="w-4 h-4" />}
@@ -179,7 +150,7 @@ function Login() {
             className="w-full rounded-2xl bg-emerald-500 dark:bg-[#e8643a] text-white py-4 text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {forgotSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-            {forgotSubmitting ? "Sending..." : "Send reset link"}
+            {forgotSubmitting ? t("auth.sendingResetLink") : t("auth.sendResetLink")}
           </button>
           <div className="flex justify-center">
             <button
@@ -187,7 +158,7 @@ function Login() {
               onClick={() => setMode("login")}
               className="text-sm font-semibold text-emerald-600 dark:text-[#e8643a] hover:underline"
             >
-              Back to login
+              {t("auth.backToLogin")}
             </button>
           </div>
         </div>

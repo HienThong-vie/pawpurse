@@ -94,20 +94,3 @@ def analyze_budgets(transactions, budgets):
         })
     return results
     
-def generate_advice(analysis_results):
-    advices = []
-    for result in analysis_results:
-        status = result["status"]
-        used_percentage = result["used_percentage"]
-        used_percentage = round(used_percentage,1)
-        period = result["period"]
-        category = result["category"]
-        if status == "exceeded":
-            advices.append(f"🔴 Alert: You have exceeded your {category} budget this {period}!")
-        elif status == "warning":
-            advices.append(f"🟠 Warning: You have used {used_percentage}% of your {category} budget this {period}!")
-        elif status == "caution":
-            advices.append(f"🟡 Caution! You have used {used_percentage}% of your {category} this {period}.")
-        else:
-            advices.append(f"🟢 Great job! You are on track with {category}.")
-    return advices

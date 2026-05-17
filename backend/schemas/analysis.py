@@ -14,4 +14,3 @@ class BudgetAnalysisItem(BaseModel):
 class AnalysisResponse(BaseModel):
     spending_by_category: Dict[str,float]
     budget_analysis: List[BudgetAnalysisItem]
-    advice: List[str]

@@ -6,3 +6,4 @@ class Category(Base):
     id = Column(Integer, primary_key = True,autoincrement = True)
     user_id = Column(String,nullable= False, index = True)
     name =  Column(String,nullable = False)
+    emoji = Column(String, nullable=False, server_default="💼")

@@ -13,6 +13,8 @@ type AuthContextValue = {
   loading: boolean;
   isRecovering: boolean;
   setIsRecovering: (v: boolean) => void;
+  username: string;
+  updateUsername: (newName: string) => Promise<void>;
 };
 
 //container holds the shape of data that will be shared globally
@@ -22,6 +24,8 @@ export const AuthContext = createContext<AuthContextValue>({
   loading: true,
   isRecovering: false,
   setIsRecovering: () => {},
+  username: "User",
+  updateUsername: async () => {},
 });
 
 //let component access auth data
@@ -84,6 +88,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return () => subscription.unsubscribe();
   }, []);
+  const username = session?.user?.user_metadata?.username || "User";
+
+  async function updateUsername(newName: string) {
+    await supabase.auth.updateUser({ data: { username: newName } });
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -92,6 +102,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         isRecovering,
         setIsRecovering,
+        username,
+        updateUsername,
       }}
     >
       {children}

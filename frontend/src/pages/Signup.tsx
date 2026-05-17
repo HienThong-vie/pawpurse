@@ -1,64 +1,51 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { CheckCircle, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Loader2, User } from "lucide-react";
 import supabase from "../lib/supabaseClient";
+import { useTranslation } from "react-i18next";
 import { useToast } from "../context/ToastContext";
 import AuthLayout from "../components/auth/AuthLayout";
 import GlassInput from "../components/auth/GlassInput";
 import PasswordStrength from "../components/auth/PasswordStrength";
 
-const FEATURES = [
-  "Track income and expenses",
-  "Set and monitor budgets",
-  "Visualize spending patterns",
-  "Set financial goals",
-];
-
-const FEATURE_DELAYS = [
-  "animate-delay-500",
-  "animate-delay-600",
-  "animate-delay-700",
-  "animate-delay-800",
-];
-
-function FeatureCards() {
-  return (
-    <div className="absolute right-8 top-1/2 -translate-y-1/2 flex flex-col gap-3 w-64">
-      {FEATURES.map((feature, i) => (
-        <div
-          key={feature}
-          className={`animate-element ${FEATURE_DELAYS[i]} flex items-center gap-3 rounded-2xl bg-white/70 dark:bg-white/[0.05] backdrop-blur-xl border border-white/20 p-4 text-sm text-white`}
-        >
-          <CheckCircle className="w-5 h-5 shrink-0" />
-          <span className="font-medium">{feature}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function Signup() {
   const [email, setEmail] = useState<string>("");
+  const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
 
   async function Signing() {
+    const trimmedUsername = username.trim();
+    if (trimmedUsername.length < 2 || trimmedUsername.length > 30) {
+      toast.error(t("auth.errorUsernameTooShort"));
+      return;
+    }
+    if (!/^[a-zA-Z0-9_ ]+$/.test(trimmedUsername)) {
+      toast.error(t("auth.errorUsernameInvalid"));
+      return;
+    }
     if (confirmPassword !== password) {
-      toast.error("Passwords do not match");
+      toast.error(t("auth.errorPasswordsNoMatch"));
       return;
     }
     setSubmitting(true);
     try {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { username: trimmedUsername } },
+      });
       if (error) {
         toast.error(error.message);
       } else {
-        toast.success("Account created! Please log in.");
+        toast.success(t("auth.toastAccountCreated"));
         navigate("/login");
       }
     } finally {
@@ -68,22 +55,29 @@ function Signup() {
 
   return (
     <AuthLayout
-      title="Create your account"
-      description="Start tracking your finances in minutes."
-      rightOverlay={<FeatureCards />}
+      title={t("auth.signupTitle")}
+      description={t("auth.signupDesc")}
     >
       <div className="space-y-5">
         <GlassInput
-          label="Email"
+          label={t("auth.usernameLabel")}
+          type="text"
+          placeholder={t("auth.usernamePlaceholder")}
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          leftIcon={<User className="w-4 h-4" />}
+        />
+        <GlassInput
+          label={t("auth.emailLabel")}
           type="email"
-          placeholder="you@example.com"
+          placeholder={t("auth.emailPlaceholder")}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           leftIcon={<Mail className="w-4 h-4" />}
         />
         <div>
           <GlassInput
-            label="Password"
+            label={t("auth.passwordLabel")}
             type={showPw ? "text" : "password"}
             placeholder="••••••••"
             value={password}
@@ -107,7 +101,7 @@ function Signup() {
           <PasswordStrength password={password} />
         </div>
         <GlassInput
-          label="Confirm password"
+          label={t("auth.confirmPasswordLabel")}
           type={showConfirmPw ? "text" : "password"}
           placeholder="••••••••"
           value={confirmPassword}
@@ -134,15 +128,15 @@ function Signup() {
           className="w-full rounded-2xl bg-emerald-500 dark:bg-[#e8643a] text-white py-4 text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-          {submitting ? "Creating account..." : "Create account"}
+          {submitting ? t("auth.creatingAccount") : t("auth.createAccountBtn")}
         </button>
         <p className="text-sm text-gray-500 dark:text-[#a0a0a0] text-center">
-          Already have an account?{" "}
+          {t("auth.alreadyHaveAccount")}{" "}
           <Link
             to="/login"
             className="text-emerald-600 dark:text-[#e8643a] font-semibold hover:underline"
           >
-            Log in
+            {t("auth.logInLink")}
           </Link>
         </p>
       </div>

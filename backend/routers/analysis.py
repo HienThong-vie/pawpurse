@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from datetime import timezone
-from core.algorithms import analyze_budgets,generate_advice,get_spending_by_category
+from core.algorithms import analyze_budgets,get_spending_by_category
 from models.transaction import Transaction
 from models.budget import Budget
 from schemas.analysis import AnalysisResponse
@@ -48,10 +48,8 @@ async def algorithms(response: Response, user_id: str = Depends(get_current_user
         )
     spending_by_category = get_spending_by_category(transactions,budgets)
     budget_analysis = analyze_budgets(transactions,budgets)
-    advice = generate_advice(budget_analysis)
 
     return AnalysisResponse(
         spending_by_category = spending_by_category,
         budget_analysis = budget_analysis,
-        advice = advice
     )

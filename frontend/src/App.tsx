@@ -11,7 +11,6 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Transactions = lazy(() => import("./pages/Transactions"));
 const Budget = lazy(() => import("./pages/Budget"));
-const Charts = lazy(() => import("./pages/Charts"));
 const Advisor = lazy(() => import("./pages/Advisor"));
 const Goals = lazy(() => import("./pages/Goals"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -61,7 +60,6 @@ function App() {
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/budget" element={<Budget />} />
           <Route path="/goals" element={<Goals />} />
-          <Route path="/charts" element={<Charts />} />
           <Route path="/advisor" element={<Advisor />} />
           <Route path="/settings" element={<Settings />} />
         </Route>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Pencil,
   Trash2,
@@ -9,8 +9,12 @@ import {
   Check,
   X,
 } from "lucide-react";
+import EmojiPicker, { Theme } from "emoji-picker-react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import { useConfirm } from "../context/ConfirmContext";
+import { useTheme } from "../context/ThemeContext";
 import { formatCurrency, fetchBaseCurrency } from "../lib/utils";
 import { apiFetch } from "../lib/api";
 import ErrorBanner from "../components/ErrorBanner";
@@ -21,14 +25,68 @@ type BudgetFieldErrors = {
   period?: string;
 };
 
+const statusPillClass: Record<string, string> = {
+  acceptable:
+    "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  caution:
+    "bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  warning:
+    "bg-orange-100 dark:bg-orange-500/15 text-orange-700 dark:text-orange-400",
+  exceeded: "bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-400",
+};
+
+const statusBarColor: Record<string, string> = {
+  acceptable: "bg-emerald-500",
+  caution: "bg-amber-500",
+  warning: "bg-orange-500",
+  exceeded: "bg-red-500",
+};
+
+function formatDM(d: string | Date | undefined | null): string {
+  if (!d) return "";
+  const dt = typeof d === "string" ? new Date(d) : d;
+  if (Number.isNaN(dt.getTime())) return "";
+  return `${dt.getDate()}/${dt.getMonth() + 1}`;
+}
+
+function formatPeriodRange(
+  period: string,
+  period_start?: string | null,
+  period_end?: string | null,
+): string {
+  if (!period_start) return "";
+  if (period === "day" || period === "daily") return formatDM(period_start);
+  if (!period_end) return formatDM(period_start);
+  // period_end is exclusive; the displayed range should be inclusive
+  const end = new Date(period_end);
+  end.setDate(end.getDate() - 1);
+  return `${formatDM(period_start)} – ${formatDM(end)}`;
+}
+
 function Budget() {
+  const { t } = useTranslation();
   const { user } = useAuth();
+  const { theme } = useTheme();
   const toast = useToast();
+  const { confirm } = useConfirm();
+  const statusLabel: Record<string, string> = {
+    acceptable: t("budget.statusHealthy"),
+    caution: t("budget.statusCaution"),
+    warning: t("budget.statusWarning"),
+    exceeded: t("budget.statusExceeded"),
+  };
+  const periodLabel: Record<string, string> = {
+    day: t("budget.periodDaily"),
+    daily: t("budget.periodDaily"),
+    week: t("budget.periodWeekly"),
+    weekly: t("budget.periodWeekly"),
+    month: t("budget.periodMonthly"),
+    monthly: t("budget.periodMonthly"),
+  };
   const [editId, setEditId] = useState<number | null>(null);
-  //backend
-  const [budgets, setBudgets] = useState<any[]>([]); //GET method
-  const [categories, setCategories] = useState<any[]>([]); //GET method
-  //form field
+  const [budgets, setBudgets] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  // Form fields
   const [category, setCategory] = useState("");
   const [limit, setLimit] = useState("");
   const [period, setPeriod] = useState("");
@@ -41,12 +99,25 @@ function Budget() {
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryEmoji, setNewCategoryEmoji] = useState("💼");
   const [submittingCategory, setSubmittingCategory] = useState(false);
+  const [emojiEditingId, setEmojiEditingId] = useState<number | "new" | null>(
+    null,
+  );
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const newCategoryInputRef = useRef<HTMLInputElement>(null);
   // Period dropdown state
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
   const periodDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Map category name -> emoji for quick lookup on budget cards
+  const emojiByCategory = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const c of categories) {
+      if (c?.name) map[c.name.toLowerCase()] = c.emoji || "💼";
+    }
+    return map;
+  }, [categories]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -59,6 +130,7 @@ function Budget() {
       setError(err.message);
     }
   }, [user?.id]);
+
   const fetchBudgets = useCallback(async () => {
     try {
       const response = await apiFetch(
@@ -77,7 +149,6 @@ function Budget() {
       try {
         const currency = await fetchBaseCurrency();
         setBaseCurrency(currency);
-
         const budgetResponse = await apiFetch(
           `http://localhost:8000/budgets/?base_currency=${currency}`,
         );
@@ -103,14 +174,34 @@ function Budget() {
         setShowCategoryDropdown(false);
         setShowAddCategory(false);
         setNewCategoryName("");
+        setEmojiEditingId(null);
+      }
+      if (
+        periodDropdownRef.current &&
+        !periodDropdownRef.current.contains(e.target as Node)
+      ) {
+        setShowPeriodDropdown(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (showAddCategory && newCategoryInputRef.current) {
+      newCategoryInputRef.current.focus();
+    }
+  }, [showAddCategory]);
+
+  function resetForm() {
+    setEditId(null);
+    setLimit("");
+    setCategory("");
+    setPeriod("");
+    setFieldErrors({});
+  }
+
   async function handleSubmit() {
-    // Inline validation
     const errs: BudgetFieldErrors = {};
     if (!category) errs.category = "Select a category";
     const lim = Number(limit);
@@ -118,6 +209,21 @@ function Budget() {
     if (!period) errs.period = "Select a period";
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) return;
+
+    if (editId == null) {
+      const existing = budgets.find(
+        (b) => b.category.toLowerCase() === category.toLowerCase(),
+      );
+      if (existing) {
+        const proceed = await confirm({
+          title: `"${existing.category}" already has a budget`,
+          message: `You have a ${existing.period === "month" ? "monthly" : existing.period === "day" ? "daily" : "weekly"} budget for "${existing.category}" with a limit of ${formatCurrency(existing.limit, baseCurrency)}. Do you want to update it with the new values?`,
+          confirmLabel: "Update",
+          danger: false,
+        });
+        if (!proceed) return;
+      }
+    }
 
     setSubmitting(true);
     try {
@@ -133,36 +239,36 @@ function Budget() {
             currency: baseCurrency,
           }),
         });
-        toast.success("Budget added");
+        toast.success(
+          budgets.some(
+            (b) => b.category.toLowerCase() === category.toLowerCase(),
+          )
+            ? t("budget.toastUpdated")
+            : t("budget.toastAdded"),
+        );
       } else {
         await apiFetch(`http://localhost:8000/budgets/${editId}`, {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            user_id: user?.id,
             category,
             limit: lim,
             period,
             currency: baseCurrency,
           }),
         });
-        toast.success("Budget updated");
+        toast.success(t("budget.toastUpdated"));
       }
       fetchBudgets();
-      setCategory("");
-      setLimit("");
-      setPeriod("");
-      setEditId(null);
-      setFieldErrors({});
+      resetForm();
     } catch (err: any) {
       setError(err.message);
     } finally {
       setSubmitting(false);
     }
   }
-  async function handleDelete(budget_id) {
+
+  async function handleDelete(budget_id: number) {
     try {
       await apiFetch(`http://localhost:8000/budgets/${budget_id}`, {
         method: "DELETE",
@@ -172,11 +278,13 @@ function Budget() {
       setError(err.message);
     }
   }
-  async function handleEdit(budget) {
+
+  async function handleEdit(budget: any) {
     setEditId(budget.id);
     setCategory(budget.category);
     setLimit(String(budget.limit));
     setPeriod(budget.period);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function handleAddCategory() {
@@ -189,12 +297,14 @@ function Budget() {
         body: JSON.stringify({
           user_id: user?.id,
           name: newCategoryName.trim(),
+          emoji: newCategoryEmoji,
         }),
       });
       toast.success("Category added");
       await fetchCategories();
       setCategory(newCategoryName.trim());
       setNewCategoryName("");
+      setNewCategoryEmoji("💼");
       setShowAddCategory(false);
       setShowCategoryDropdown(false);
     } catch (err: any) {
@@ -204,25 +314,101 @@ function Budget() {
     }
   }
 
+  async function handleUpdateCategoryEmoji(id: number, emoji: string) {
+    try {
+      await apiFetch(`http://localhost:8000/categories/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji }),
+      });
+      await fetchCategories();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setEmojiEditingId(null);
+    }
+  }
+
+  async function handlePickEmoji(emoji: string) {
+    if (emojiEditingId === "new") {
+      setNewCategoryEmoji(emoji);
+      setEmojiEditingId(null);
+    } else if (typeof emojiEditingId === "number") {
+      await handleUpdateCategoryEmoji(emojiEditingId, emoji);
+    }
+  }
+
+  async function handleDeleteCategory(category_id: any) {
+    const cat = categories.find((c) => c.id === category_id);
+    if (!cat) return;
+
+    try {
+      const txRes = await apiFetch(
+        `http://localhost:8000/transactions/?base_currency=${baseCurrency}`,
+      );
+      const txData = await txRes.json();
+      const relatedTx = txData.filter((t: any) => t.category === cat.name);
+      const relatedBudgets = budgets.filter((b: any) => b.category === cat.name);
+
+      const txCount = relatedTx.length;
+      const budgetCount = relatedBudgets.length;
+
+      if (txCount > 0 || budgetCount > 0) {
+        const txLabel = `${txCount} transaction${txCount !== 1 ? "s" : ""}`;
+        const budgetLabel = `${budgetCount} budget${budgetCount !== 1 ? "s" : ""}`;
+        const proceed = await confirm({
+          title: `Delete "${cat.name}"?`,
+          message: `This category has ${txLabel} and ${budgetLabel}. Deleting it will also remove them. This cannot be undone.`,
+          confirmLabel: "Delete",
+          danger: true,
+        });
+        if (!proceed) return;
+
+        await Promise.all([
+          ...relatedTx.map((t: any) =>
+            apiFetch(`http://localhost:8000/transactions/${t.id}`, {
+              method: "DELETE",
+            }),
+          ),
+          ...relatedBudgets.map((b: any) =>
+            apiFetch(`http://localhost:8000/budgets/${b.id}`, {
+              method: "DELETE",
+            }),
+          ),
+        ]);
+      }
+
+      await apiFetch(`http://localhost:8000/categories/${category_id}`, {
+        method: "DELETE",
+      });
+      toast.success(`Category "${cat.name}" deleted`);
+      await fetchCategories();
+      await fetchBudgets();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  }
+
   const Divider = () => (
-    <div className="w-px bg-gray-300 dark:bg-[#2a2a2a] self-stretch my-2 shrink-0" />
+    <div className="hidden sm:block w-px bg-gray-300 dark:bg-[var(--bd)] self-stretch my-2 shrink-0" />
   );
 
   const hasFieldError =
     fieldErrors.limit || fieldErrors.category || fieldErrors.period;
+
   if (loading) {
     return (
       <div className="font-[Inter] animate-pulse">
         <div className="mb-6 lg:mb-8">
-          <div className="h-8 w-32 bg-gray-200 dark:bg-[#222] rounded mb-2" />
-          <div className="h-4 w-48 bg-gray-200 dark:bg-[#222] rounded" />
+          <div className="h-8 w-32 bg-gray-200 dark:bg-[var(--bg-muted)] rounded mb-2" />
+          <div className="h-4 w-48 bg-gray-200 dark:bg-[var(--bg-muted)] rounded" />
         </div>
-        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-6 mb-6 h-32" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[0, 1, 2, 3].map((i) => (
+        <div className="bg-white dark:bg-[var(--bg-surface)] rounded-xl border border-gray-300 dark:border-[var(--bd)] shadow-sm p-6 mb-6 h-16" />
+        <div className="space-y-3 mt-5">
+          {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="bg-white  rounded-xl border border-gray-300 dark:border-[#2a2a2a] dark:bg-[#1a1a1a] shadow-sm p-5 h-32"
+              className="bg-white rounded-xl border border-gray-200 dark:border-[var(--bd)] dark:bg-[var(--bg-surface)] shadow-sm p-4 h-24"
             />
           ))}
         </div>
@@ -230,29 +416,12 @@ function Budget() {
     );
   }
 
-  const statusBarColor: Record<string, string> = {
-    acceptable: "bg-emerald-500",
-    caution: "bg-yellow-500",
-    warning: "bg-orange-500",
-    exceeded: "bg-red-500",
-  };
-  function resetForm() {
-    setEditId(null);
-    setLimit("");
-    setCategory("");
-    setPeriod("");
-    setFieldErrors({});
-  }
-
   return (
-    <div className="font-[Inter]">
-      {/* Page header */}
+    <div className="font-[Inter] overflow-x-hidden">
+      {/* Page subtitle */}
       <header className="mb-6 lg:mb-8">
-        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
-          Budget
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-[#a0a0a0] mt-1">
-          Track your spending limits
+        <p className="text-sm text-gray-500 dark:text-[#a0a0a0]">
+          {t("budget.subtitle")}
         </p>
       </header>
 
@@ -260,246 +429,340 @@ function Budget() {
         <ErrorBanner message={error} onDismiss={() => setError(null)} />
       )}
 
-      {/*Unified input bar  */}
+      {/* ── SECTION HEADING ── */}
+      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#a0a0a0] mb-2">
+        {t("budget.sectionBudget")}
+      </p>
+
+      {/* ── UNIFIED INPUT BAR ── */}
       <div className="mt-1">
         <div
           className={`
-            flex items-center
-            gap-6 px-2
-            border border-gray-300 dark:border-[#2a2a2a]
+            flex flex-col sm:flex-row items-stretch sm:items-center
+            border border-gray-300 dark:border-[var(--bd)]
             rounded-xl overflow-visible
-            bg-white dark:bg-[#0f0f0f]
-            shadow-sm
-            transition-all duration-150 ${hasFieldError ? "border-red-400 dark:border-red-500/60 ring-1 ring-red-400/30 dark:ring-red-500/20" : ""}`}
+            bg-white dark:bg-[var(--bg-surface)]
+            shadow-sm transition-all duration-150
+            ${hasFieldError ? "border-red-400 dark:border-red-500/60 ring-1 ring-red-400/30 dark:ring-red-500/20" : ""}
+          `}
         >
-          {/*input amount */}
-          <input
-            type="number"
-            placeholder="Amount"
-            value={limit}
-            onChange={(e) => {
-              setLimit(e.target.value);
-              setFieldErrors((p) => ({ ...p, amount: undefined }));
-            }}
-            className={`
-              flex-1 min-w-24 shrink-0 px-3.5 py-2.5 text-sm
-              bg-transparent border-none outline-none
-              text-gray-900 dark:text-white
-              placeholder-gray-400 dark:placeholder-[#555]
-              [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
-            ${
-              limit
-                ? "text-gray-900 dark:text-white"
-                : fieldErrors.limit
-                  ? "text-red-400"
-                  : "text-gray-400 dark:text-[#555]"
-            }`}
-          />
-          <Divider />
-
-          {/* Category custom dropdown */}
-          <div className="relative shrink-0" ref={categoryDropdownRef}>
-            <button
-              type="button"
-              onClick={() => {
-                setShowCategoryDropdown((p) => !p);
-                setShowAddCategory(false);
+          {/* ─── ROW 1: Amount · Category ─── */}
+          <div className="flex flex-col items-stretch sm:flex-row sm:items-center flex-1 min-w-0">
+            {/* Amount / Limit */}
+            <input
+              type="number"
+              placeholder={t("budget.limitPlaceholder")}
+              value={limit}
+              onChange={(e) => {
+                setLimit(e.target.value);
+                setFieldErrors((p) => ({ ...p, limit: undefined }));
               }}
               className={`
-                flex items-center gap-1.5 px-3 py-2.5 text-sm
-                bg-transparent border-none outline-none
-                transition-colors whitespace-nowrap
+                w-full sm:flex-1 min-w-0 sm:min-w-[140px] px-3.5 py-2.5 text-sm
+                bg-transparent border-none outline-none sm:text-left
+                [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
                 ${
-                  category
+                  limit
                     ? "text-gray-900 dark:text-white"
-                    : fieldErrors.category
-                      ? "text-red-400"
-                      : "text-gray-400 dark:text-[#555]"
+                    : fieldErrors.limit
+                      ? "text-red-400 placeholder-red-300"
+                      : "text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555]"
                 }
               `}
+            />
+
+            <Divider />
+
+            {/* Category custom dropdown */}
+            <div
+              className="relative shrink-0 w-full sm:w-auto"
+              ref={categoryDropdownRef}
             >
-              {category || "Select category"}
-              <ChevronDown
-                className={`w-3.5 h-3.5 transition-transform duration-150 ${showCategoryDropdown ? "rotate-180" : ""}`}
-              />
-            </button>
-
-            {/* Dropdown panel */}
-            {showCategoryDropdown && (
-              <div className="thin-scrollbar absolute top-full left-0 mt-1.5 w-52 bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-[#2a2a2a] rounded-xl shadow-lg z-50 overflow-hidden py-1">
-                {/* Category list */}
-                {categories.length > 0 ? (
-                  <div className="max-h-48 overflow-y-auto">
-                    {categories.map((cat) => (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => {
-                          setCategory(cat.name);
-                          setShowCategoryDropdown(false);
-                          setFieldErrors((p) => ({
-                            ...p,
-                            category: undefined,
-                          }));
-                        }}
-                        className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-[#e0e0e0] hover:bg-gray-50 dark:hover:bg-[#222] transition-colors text-left"
-                      >
-                        {cat.name}
-                        {category === cat.name && (
-                          <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-[#e8643a]" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCategoryDropdown((p) => !p);
+                  setShowAddCategory(false);
+                }}
+                className={`
+                  w-full sm:w-auto flex items-center gap-1.5 px-3 py-2.5 text-sm
+                  justify-between text-center
+                  bg-transparent border-none outline-none
+                  transition-colors whitespace-nowrap
+                  ${
+                    category
+                      ? "text-gray-900 dark:text-white"
+                      : fieldErrors.category
+                        ? "text-red-400"
+                        : "text-gray-400 dark:text-[#555]"
+                  }
+                `}
+              >
+                {category ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-base leading-none">
+                      {emojiByCategory[category.toLowerCase()] || "💼"}
+                    </span>
+                    {category}
+                  </span>
                 ) : (
-                  <p className="px-3 py-2 text-xs text-gray-400 dark:text-[#555]">
-                    No categories yet
-                  </p>
+                  t("budget.selectCategory")
                 )}
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform duration-150 ${showCategoryDropdown ? "rotate-180" : ""}`}
+                />
+              </button>
 
-                {/* Divider */}
-                <div className="h-px bg-gray-100 dark:bg-[#2a2a2a] mx-2 my-1" />
-
-                {/* Add new category */}
-                {!showAddCategory ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowAddCategory(true)}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-emerald-600 dark:text-[#e8643a] hover:bg-gray-50 dark:hover:bg-[#222] transition-colors font-medium"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Add new category
-                  </button>
-                ) : (
-                  <div className="px-2 pb-2 pt-1">
-                    <div className="flex gap-1.5">
-                      <input
-                        ref={newCategoryInputRef}
-                        type="text"
-                        placeholder="Category name"
-                        value={newCategoryName}
-                        onChange={(e) => setNewCategoryName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleAddCategory();
-                          if (e.key === "Escape") {
-                            setShowAddCategory(false);
-                            setNewCategoryName("");
-                          }
-                        }}
-                        className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-[#2a2a2a] bg-white dark:bg-[#0f0f0f] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a]"
+              {showCategoryDropdown && (
+                <div
+                  className={`absolute top-full left-1/2 -translate-x-1/2 mt-1.5 ${emojiEditingId !== null ? "w-[270px]" : "w-52"} bg-white dark:bg-[var(--bg-surface)] border border-gray-300 dark:border-[var(--bd)] rounded-xl shadow-lg z-50 overflow-hidden`}
+                >
+                  {emojiEditingId !== null ? (
+                    /* ── Emoji picker overlay ── */
+                    <>
+                      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-[var(--bd)]">
+                        <span className="text-xs font-semibold text-gray-500 dark:text-[#a0a0a0]">
+                          {t("transactions.pickEmoji")}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setEmojiEditingId(null)}
+                          className="p-0.5 text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <EmojiPicker
+                        onEmojiClick={(emojiData) =>
+                          handlePickEmoji(emojiData.emoji)
+                        }
+                        theme={theme === "dark" ? Theme.DARK : Theme.LIGHT}
+                        lazyLoadEmojis
+                        width={268}
+                        height={350}
                       />
-                      <button
-                        type="button"
-                        onClick={handleAddCategory}
-                        disabled={submittingCategory || !newCategoryName.trim()}
-                        className="px-2.5 py-1.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-xs font-semibold disabled:opacity-50 hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors"
-                      >
-                        {submittingCategory ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          "Add"
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowAddCategory(false);
-                          setNewCategoryName("");
-                        }}
-                        className="px-2 py-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          <Divider />
-          {/* Period custom dropdown */}
-          <div className="relative shrink-0" ref={periodDropdownRef}>
-            <button
-              type="button"
-              onClick={() => setShowPeriodDropdown((p) => !p)}
-              className={`
-      flex items-center gap-1.5 px-3 py-2.5 text-sm
-      bg-transparent border-none outline-none
-      transition-colors whitespace-nowrap
-      ${
-        period
-          ? "text-gray-900 dark:text-white"
-          : fieldErrors.period
-            ? "text-red-400"
-            : "text-gray-400 dark:text-[#555]"
-      }`}
-            >
-              {/* Capitalize the first letter of the period or show placeholder */}
-              {period
-                ? period.charAt(0).toUpperCase() + period.slice(1)
-                : "Select period"}
-              <ChevronDown
-                className={`w-3.5 h-3.5 transition-transform duration-150 ${
-                  showPeriodDropdown ? "rotate-180" : ""
-                }`}
-              />
-            </button>
+                    </>
+                  ) : (
+                    /* ── Normal list ── */
+                    <div className="py-1">
+                      {categories.length > 0 ? (
+                        <div className="thin-scrollbar max-h-48 overflow-y-auto">
+                          {categories.map((cat) => (
+                            <div
+                              key={cat.id}
+                              className="group flex items-center gap-1 px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] transition-colors"
+                            >
+                              {/* Emoji button */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEmojiEditingId(cat.id);
+                                }}
+                                className="w-7 h-7 rounded-md flex items-center justify-center text-base hover:bg-gray-200 dark:hover:bg-[var(--bg-muted)] transition-colors shrink-0"
+                                title="Change emoji"
+                              >
+                                {cat.emoji || "💼"}
+                              </button>
+                              {/* Name */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCategory(cat.name);
+                                  setShowCategoryDropdown(false);
+                                  setFieldErrors((p) => ({
+                                    ...p,
+                                    category: undefined,
+                                  }));
+                                }}
+                                className="flex-1 text-sm text-gray-700 dark:text-[#e0e0e0] text-left py-0.5"
+                              >
+                                {cat.name}
+                              </button>
+                              {category === cat.name && (
+                                <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-[#e8643a] shrink-0" />
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteCategory(cat.id);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-opacity"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="px-3 py-2 text-xs text-gray-400 dark:text-[#555]">
+                          {t("transactions.noCategoriesYet")}
+                        </p>
+                      )}
 
-            {/* Dropdown panel */}
-            {showPeriodDropdown && (
-              <div className="absolute top-full left-0 mt-1.5 w-36 bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-[#2a2a2a] rounded-xl shadow-lg z-50 overflow-hidden py-1">
-                {["week", "month"].map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => {
-                      setPeriod(p);
-                      setShowPeriodDropdown(false);
-                      setFieldErrors((prev) => ({
-                        ...prev,
-                        period: undefined,
-                      }));
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-[#e0e0e0] hover:bg-gray-50 dark:hover:bg-[#222] transition-colors text-left"
-                  >
-                    <span className="capitalize">{p}</span>
-                    {period === p && (
-                      <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-[#e8643a]" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
+                      <div className="h-px bg-gray-100 dark:bg-[var(--bg-muted)] mx-2 my-1" />
+
+                      {!showAddCategory ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowAddCategory(true)}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-emerald-600 dark:text-[#e8643a] hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] transition-colors font-medium"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          {t("transactions.addNewCategory")}
+                        </button>
+                      ) : (
+                        <div className="px-2 pb-2 pt-1">
+                          <div className="flex gap-1.5 items-center">
+                            <button
+                              type="button"
+                              onClick={() => setEmojiEditingId("new")}
+                              className="w-7 h-7 shrink-0 rounded-md bg-gray-100 dark:bg-[var(--bg-muted)] hover:bg-gray-200 dark:hover:bg-[var(--bg-hover)] flex items-center justify-center text-base leading-none select-none"
+                              title="Pick emoji"
+                            >
+                              {newCategoryEmoji}
+                            </button>
+                            <input
+                              ref={newCategoryInputRef}
+                              type="text"
+                              placeholder={t("transactions.categoryNamePlaceholder")}
+                              value={newCategoryName}
+                              onChange={(e) => setNewCategoryName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleAddCategory();
+                                if (e.key === "Escape") {
+                                  setShowAddCategory(false);
+                                  setNewCategoryName("");
+                                }
+                              }}
+                              className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-[var(--bd)] bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a]"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleAddCategory}
+                              disabled={submittingCategory || !newCategoryName.trim()}
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-xs font-semibold disabled:opacity-50 hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors"
+                            >
+                              {submittingCategory ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                t("common.add")
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowAddCategory(false);
+                                setNewCategoryName("");
+                              }}
+                              className="px-2 py-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-          <Divider />
-          {editId !== null && (
-            <button
-              type="button"
-              onClick={resetForm}
-              className="mr-1 px-3 py-1.5 rounded-lg text-sm font-semibold text-gray-600 dark:text-[#aaa] hover:bg-gray-100 dark:hover:bg-[#222] transition-colors"
+
+          {/* ─── Cross-row separator ─── */}
+          <div className="sm:hidden h-px bg-gray-300 dark:bg-[var(--bd)]" />
+          <div className="hidden sm:block w-px bg-gray-300 dark:bg-[var(--bd)] self-stretch my-2 shrink-0" />
+
+          {/* ─── ROW 2: Period · Actions ─── */}
+          <div className="flex flex-col items-center sm:flex-row sm:items-center">
+            {/* Period custom dropdown */}
+            <div
+              className="relative shrink-0 w-full sm:w-auto"
+              ref={periodDropdownRef}
             >
-              Cancel
-            </button>
-          )}
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="flex items-center gap-1.5 p-l mr-3.5 px-4 py-1.5 rounded-lg bg-transparent text-gray-600 text-sm font-semibold hover:text-white hover:bg-emerald-600 dark:hover:bg-[#d2552d] dark:text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
-          >
-            {submitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Plus className="w-4 h-4" />
+              <button
+                type="button"
+                onClick={() => setShowPeriodDropdown((p) => !p)}
+                className={`
+                  w-full sm:w-auto flex items-center gap-1.5 px-3 py-2.5 text-sm
+                  justify-between text-center
+                  bg-transparent border-none outline-none
+                  transition-colors whitespace-nowrap
+                  ${
+                    period
+                      ? "text-gray-900 dark:text-white"
+                      : fieldErrors.period
+                        ? "text-red-400"
+                        : "text-gray-400 dark:text-[#555]"
+                  }`}
+              >
+                {period ? periodLabel[period] ?? period : t("budget.selectPeriod")}
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform duration-150 ${
+                    showPeriodDropdown ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {showPeriodDropdown && (
+                <div className="absolute top-full left-0 mt-1.5 w-36 bg-white dark:bg-[var(--bg-surface)] border border-gray-300 dark:border-[var(--bd)] rounded-xl shadow-lg z-50 overflow-hidden py-1">
+                  {["day", "week", "month"].map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => {
+                        setPeriod(p);
+                        setShowPeriodDropdown(false);
+                        setFieldErrors((prev) => ({
+                          ...prev,
+                          period: undefined,
+                        }));
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-[#e0e0e0] hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] transition-colors text-left"
+                    >
+                      <span>{periodLabel[p] ?? p}</span>
+                      {period === p && (
+                        <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-[#e8643a]" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Divider />
+
+            {editId !== null && (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="hidden sm:block mr-1 px-3 py-1.5 rounded-lg text-sm font-semibold text-gray-600 dark:text-[#aaa] hover:bg-gray-100 dark:hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                {t("common.cancel")}
+              </button>
             )}
-            {submitting
-              ? editId
-                ? "Updating..."
-                : "Adding..."
-              : editId
-                ? "Update"
-                : "Add"}
-          </button>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="flex items-center justify-center gap-1.5 w-[calc(100%-1.5rem)] sm:w-auto mx-3 mb-3 mt-3 sm:mt-0 sm:mx-0 sm:mb-0 sm:mr-3.5 px-4 py-2.5 sm:py-1.5 rounded-lg bg-emerald-500 sm:bg-transparent dark:bg-[#e8643a] sm:dark:bg-transparent text-white hover:text-white sm:text-gray-600 sm:dark:text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              {submitting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
+              {submitting
+                ? editId
+                  ? t("budget.updatingBtn")
+                  : t("budget.addingBtn")
+                : editId
+                  ? t("budget.updateBtn")
+                  : t("budget.addBtn")}
+            </button>
+          </div>
         </div>
+
         {/* Inline validation message */}
         {hasFieldError && (
           <p className="mt-1.5 ml-1 text-xs text-red-500 dark:text-red-400">
@@ -510,83 +773,164 @@ function Budget() {
         )}
       </div>
 
-      {/* Budget cards grid */}
-      {budgets.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
-          {budgets.map((budget) => {
-            const barColor = statusBarColor[budget.status] || "bg-gray-400";
-            const pct = Math.min(budget.percentage ?? 0, 100);
-            return (
-              <div
-                key={budget.id}
-                className="relative bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-5"
-              >
-                {/* Top right actions */}
-                <div className="absolute top-3 right-3 flex gap-1">
-                  <button
-                    onClick={() => handleEdit(budget)}
-                    className="p-1.5 rounded-md text-gray-400 dark:text-[#666] hover:text-gray-700 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#222] transition-colors"
-                    aria-label="Edit budget"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(budget.id)}
-                    className="p-1.5 rounded-md text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                    aria-label="Delete budget"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+      {/* ── SECTION HEADING ── */}
+      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#a0a0a0] mt-5 mb-2">
+        {t("budget.sectionYourBudgets")}
+      </p>
 
-                {/* Header */}
-                <div className="flex items-center gap-2 mb-4 pr-16">
-                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
-                    {budget.category}
-                  </h3>
-                  <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#2a2a2a] text-xs font-medium text-gray-600 dark:text-[#a0a0a0] capitalize">
-                    {budget.period}
-                  </span>
-                </div>
+      {/* ── BUDGET CARDS (scrollable) ── */}
+      <div
+        className="overflow-auto thin-scrollbar"
+        style={{ maxHeight: "calc(100vh - 360px)", minHeight: "200px" }}
+      >
+        {budgets.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-1">
+            {budgets.map((budget) => {
+              const pct = Math.min(budget.percentage ?? 0, 100);
+              const barColor =
+                statusBarColor[budget.status] ?? "bg-gray-400";
+              return (
+                <div
+                  key={budget.id}
+                  className="bg-white dark:bg-[var(--bg-surface)] rounded-xl border border-gray-200 dark:border-[var(--bd)] shadow-sm p-3"
+                >
+                  {/* ── Single row: emoji · name/period · status · amounts · actions ── */}
+                  <div className="flex items-center gap-2">
+                    {/* Emoji icon (looked up from category) */}
+                    <div className="w-9 h-9 shrink-0 rounded-lg bg-gray-100 dark:bg-[var(--bg-muted)] flex items-center justify-center text-xl leading-none select-none">
+                      {emojiByCategory[budget.category?.toLowerCase()] || "💼"}
+                    </div>
 
-                {/* Progress bar */}
-                <div className="w-full h-2.5 bg-gray-100 dark:bg-[#2a2a2a] rounded-full overflow-hidden mb-2">
-                  <div
-                    className={`${barColor} h-full rounded-full transition-all`}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
+                    {/* Name + period (with date range) */}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-gray-900 dark:text-white truncate leading-snug">
+                        {budget.category}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-[#a0a0a0] flex items-center gap-1.5">
+                        <span>{periodLabel[budget.period] ?? budget.period}</span>
+                        {formatPeriodRange(
+                          budget.period,
+                          budget.period_start,
+                          budget.period_end,
+                        ) && (
+                          <>
+                            <span className="text-gray-300 dark:text-[#555]">·</span>
+                            <span className="text-[11px] text-gray-400 dark:text-[#666] tabular-nums">
+                              {formatPeriodRange(
+                                budget.period,
+                                budget.period_start,
+                                budget.period_end,
+                              )}
+                            </span>
+                          </>
+                        )}
+                      </p>
+                    </div>
 
-                {/* Spent / limit + percentage */}
-                <div className="flex items-baseline justify-between text-sm">
-                  <span className="text-gray-600 dark:text-[#a0a0a0]">
-                    <span className="font-semibold text-gray-900 dark:text-white">
-                      {formatCurrency(budget.spent, baseCurrency)}
-                    </span>{" "}
-                    / {formatCurrency(budget.limit, baseCurrency)}
-                  </span>
-                  <span className="font-semibold text-gray-700 dark:text-[#e0e0e0]">
-                    {budget.percentage?.toFixed(1)}%
-                  </span>
+                    {/* Status pill */}
+                    <span
+                      className={`hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 ${
+                        statusPillClass[budget.status] ??
+                        "bg-gray-100 dark:bg-[var(--bg-muted)] text-gray-600 dark:text-[#a0a0a0]"
+                      }`}
+                    >
+                      {statusLabel[budget.status] ?? budget.status}
+                    </span>
+
+                    {/* Amounts */}
+                    <div className="flex items-baseline gap-1 shrink-0">
+                      <span className="text-sm font-bold text-gray-900 dark:text-white tabular-nums">
+                        {formatCurrency(budget.spent, baseCurrency)}
+                      </span>
+                      <span className="text-gray-400 dark:text-[#555] text-xs">/</span>
+                      <span className="text-xs text-gray-500 dark:text-[#a0a0a0] tabular-nums">
+                        {formatCurrency(budget.limit, baseCurrency)}
+                      </span>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-0.5 shrink-0">
+                      <button
+                        onClick={() => handleEdit(budget)}
+                        className="p-1.5 rounded-md text-gray-400 dark:text-[#666] hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[var(--bg-hover)] transition-colors"
+                        aria-label="Edit budget"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(budget.id)}
+                        className="p-1.5 rounded-md text-red-400 dark:text-red-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                        aria-label="Delete budget"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* ── Progress bar ── */}
+                  <div className="mt-1.5 w-full h-1.5 bg-gray-100 dark:bg-[var(--bg-muted)] rounded-full overflow-hidden">
+                    <div
+                      className={`${barColor} h-full rounded-full transition-all duration-500`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+
+                  {/* Percentage + saved label */}
+                  <div className="mt-0.5 flex justify-end items-baseline gap-1.5">
+                    <span className="text-xs text-gray-400 dark:text-[#555] tabular-nums">
+                      {budget.percentage?.toFixed(1)}%
+                    </span>
+                    <span className="text-gray-300 dark:text-[#555] text-xs">
+                      ·
+                    </span>
+                    {(() => {
+                      const saved = Math.max(
+                        0,
+                        (budget.limit ?? 0) - (budget.spent ?? 0),
+                      );
+                      const savedFormatted = new Intl.NumberFormat("en-US", {
+                        style: "currency",
+                        currency: baseCurrency,
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 1,
+                      }).format(saved);
+                      const isZero = saved <= 0;
+                      return (
+                        <span className="text-xs text-gray-400 dark:text-[#555] tabular-nums">
+                          {t("budget.savedLabel")}{" "}
+                          <span
+                            className={`font-semibold ${
+                              isZero
+                                ? "text-red-500 dark:text-red-400"
+                                : "text-emerald-600 dark:text-emerald-400"
+                            }`}
+                          >
+                            {savedFormatted}
+                          </span>
+                        </span>
+                      );
+                    })()}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="bg-white mt-5 dark:bg-[#1a1a1a] rounded-xl border border-gray-300 dark:border-[#2a2a2a] shadow-sm p-12 flex flex-col items-center text-center">
-          <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-[#e8643a]/10 flex items-center justify-center mb-3">
-            <Wallet className="w-6 h-6 text-emerald-600 dark:text-[#e8643a]" />
+              );
+            })}
           </div>
-          <p className="text-base font-semibold text-gray-900 dark:text-white mb-1">
-            No budgets yet
-          </p>
-          <p className="text-sm text-gray-500 dark:text-[#a0a0a0]">
-            Add your first budget above to start tracking spending limits.
-          </p>
-        </div>
-      )}
+        ) : (
+          <div className="bg-white dark:bg-[var(--bg-surface)] rounded-xl border border-gray-300 dark:border-[var(--bd)] shadow-sm p-12 flex flex-col items-center text-center">
+            <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-[#e8643a]/10 flex items-center justify-center mb-3">
+              <Wallet className="w-6 h-6 text-emerald-600 dark:text-[#e8643a]" />
+            </div>
+            <p className="text-base font-semibold text-gray-900 dark:text-white mb-1">
+              {t("budget.noBudgetsTitle")}
+            </p>
+            <p className="text-sm text-gray-500 dark:text-[#a0a0a0]">
+              {t("budget.noBudgetsDesc")}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
 export default Budget;
