@@ -421,7 +421,7 @@ function Goals() {
         style={{ maxHeight: "calc(100vh - 360px)", minHeight: "200px" }}
       >
         {goals.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-1">
+          <div className="grid grid-cols-1 min-[1400px]:grid-cols-2 gap-4 pb-1">
             {goals.map((goal) => {
               const pct =
                 goal.target_amount > 0

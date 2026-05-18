@@ -76,6 +76,7 @@ function Dashboard() {
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
   const periodDropdownRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const rolloverChecked = useRef(false);
 
   useEffect(() => {
     async function init() {
@@ -106,70 +107,126 @@ function Dashboard() {
       fetchedBudgets: any[],
       currency: string,
     ) {
+      if (rolloverChecked.current) return;
+      rolloverChecked.current = true;
       if (!user?.id || !Array.isArray(fetchedBudgets)) return;
-      const storageKey = `budget_snapshot_${user.id}`;
-      const stored = localStorage.getItem(storageKey);
-      const snapshot: BudgetSnapshot = stored ? JSON.parse(stored) : {};
-      const nextSnapshot: BudgetSnapshot = {};
-      let createdAny = false;
 
-      // Fetch the latest notifications inline so the dedupe check isn't
-      // racing the NotificationContext's initial fetch.
+      const notifPrefs = user?.user_metadata?.notification_prefs ?? {};
+      const budgetDefaults = user?.user_metadata?.budget_defaults ?? {};
+      const budgetSavedEnabled =
+        notifPrefs.budget_saved !== false &&
+        budgetDefaults.auto_suggest_goals !== false;
+      const budgetWarningEnabled = notifPrefs.budget_warning !== false;
+      const warningThreshold = Number(notifPrefs.warning_threshold ?? 80);
+
+      if (!budgetSavedEnabled && !budgetWarningEnabled) return;
+
+      // Fetch existing notifications once for both dedup checks.
       let existingNotifs: any[] = [];
       try {
         const r = await apiFetch(`http://localhost:8000/notifications/`);
         existingNotifs = await r.json();
       } catch {
-        // dedupe falls back to permissive; worst case we send a dupe once
+        // permissive — worst case we send a duplicate once
       }
 
-      for (const b of fetchedBudgets) {
-        if (!b?.category || !b?.period_start) continue;
-        const prior = snapshot[b.category];
-        nextSnapshot[b.category] = {
-          period_start: String(b.period_start),
-          spent: Number(b.spent ?? 0),
-          limit: Number(b.limit ?? 0),
-          currency: b.currency || currency,
-        };
-        if (!prior) continue;
-        if (prior.period_start === String(b.period_start)) continue;
+      let createdAny = false;
 
-        const saved = prior.limit - prior.spent;
-        if (saved <= 0) continue;
+      // ── budget_saved: detect period rollovers ──────────────────────
+      if (budgetSavedEnabled) {
+        const storageKey = `budget_snapshot_${user.id}`;
+        const stored = localStorage.getItem(storageKey);
+        const snapshot: BudgetSnapshot = stored ? JSON.parse(stored) : {};
+        const nextSnapshot: BudgetSnapshot = {};
 
-        // Dedupe: avoid re-posting the same rollover notification
-        const duplicate = existingNotifs.some(
-          (n: any) =>
-            n.type === "budget_saved" &&
-            n.data?.budget_category === b.category &&
-            n.data?.period_start === prior.period_start,
-        );
-        if (duplicate) continue;
+        for (const b of fetchedBudgets) {
+          if (!b?.category || !b?.period_start) continue;
+          const prior = snapshot[b.category];
+          nextSnapshot[b.category] = {
+            period_start: String(b.period_start),
+            spent: Number(b.spent ?? 0),
+            limit: Number(b.limit ?? 0),
+            currency: b.currency || currency,
+          };
+          if (!prior) continue;
+          if (prior.period_start === String(b.period_start)) continue;
 
-        try {
-          await apiFetch(`http://localhost:8000/notifications/`, {
-            method: "POST",
-            body: JSON.stringify({
-              type: "budget_saved",
-              title: `You saved on ${b.category}!`,
-              body: `You saved ${formatCurrency(saved, prior.currency)} on your ${b.category} budget last period. Add it to a goal?`,
-              data: {
-                saved_amount: saved,
-                budget_category: b.category,
-                currency: prior.currency,
-                period_start: prior.period_start,
-                action: "navigate_goals",
-              },
-            }),
-          });
-          createdAny = true;
-        } catch (err) {
-          console.error("Failed to create budget_saved notification", err);
+          const saved = prior.limit - prior.spent;
+          if (saved <= 0) continue;
+
+          const duplicate = existingNotifs.some(
+            (n: any) =>
+              n.type === "budget_saved" &&
+              n.data?.budget_category === b.category &&
+              n.data?.period_start === prior.period_start,
+          );
+          if (duplicate) continue;
+
+          try {
+            await apiFetch(`http://localhost:8000/notifications/`, {
+              method: "POST",
+              body: JSON.stringify({
+                type: "budget_saved",
+                title: `You saved on ${b.category}!`,
+                body: `You saved ${formatCurrency(saved, prior.currency)} on your ${b.category} budget last period. Add it to a goal?`,
+                data: {
+                  saved_amount: saved,
+                  budget_category: b.category,
+                  currency: prior.currency,
+                  period_start: prior.period_start,
+                  action: "navigate_goals",
+                },
+              }),
+            });
+            createdAny = true;
+          } catch (err) {
+            console.error("Failed to create budget_saved notification", err);
+          }
+        }
+
+        localStorage.setItem(storageKey, JSON.stringify(nextSnapshot));
+      }
+
+      // ── budget_warning: alert when spending crosses the threshold ──
+      if (budgetWarningEnabled) {
+        for (const b of fetchedBudgets) {
+          if (!b?.category || !b?.period_start || !(Number(b.limit) > 0))
+            continue;
+          const spentPct =
+            (Number(b.spent ?? 0) / Number(b.limit)) * 100;
+          if (spentPct < warningThreshold) continue;
+
+          const duplicate = existingNotifs.some(
+            (n: any) =>
+              n.type === "budget_warning" &&
+              n.data?.budget_category === b.category &&
+              n.data?.period_start === String(b.period_start),
+          );
+          if (duplicate) continue;
+
+          const remaining = Number(b.limit) - Number(b.spent ?? 0);
+          try {
+            await apiFetch(`http://localhost:8000/notifications/`, {
+              method: "POST",
+              body: JSON.stringify({
+                type: "budget_warning",
+                title: `${b.category} budget at risk`,
+                body: `You've used ${spentPct.toFixed(0)}% of your ${b.category} budget. ${formatCurrency(remaining, b.currency || currency)} remaining.`,
+                data: {
+                  spent_pct: Math.round(spentPct),
+                  budget_category: b.category,
+                  currency: b.currency || currency,
+                  period_start: String(b.period_start),
+                },
+              }),
+            });
+            createdAny = true;
+          } catch (err) {
+            console.error("Failed to create budget_warning notification", err);
+          }
         }
       }
 
-      localStorage.setItem(storageKey, JSON.stringify(nextSnapshot));
       if (createdAny) await refreshNotifications();
     }
 

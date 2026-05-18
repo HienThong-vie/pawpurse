@@ -59,6 +59,13 @@ def update_transaction(transaction_id: int, data: TransactionUpdate, user_id: st
     return filtered_transactions
 
 
+@router.delete("/all")
+def delete_all_transactions(user_id: str = Depends(get_current_user), db: Session = Depends(get_db)):
+    deleted = db.query(Transaction).filter(Transaction.user_id == user_id).delete(synchronize_session=False)
+    db.commit()
+    return {"Message": "All transactions deleted", "count": deleted}
+
+
 @router.delete("/{transaction_id}")
 def delete_transaction(transaction_id: int, user_id: str = Depends(get_current_user), db: Session = Depends(get_db)):
     filtered_transaction = db.query(Transaction).filter(Transaction.user_id == user_id, Transaction.id == transaction_id).first()

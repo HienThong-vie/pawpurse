@@ -110,6 +110,13 @@ def update_budget(budget_id: int, data: BudgetUpdate, user_id: str = Depends(get
     db.refresh(filtered_budgets)
     return filtered_budgets
 
+@router.delete("/all")
+def delete_all_budgets(user_id: str = Depends(get_current_user), db: Session = Depends(get_db)):
+    deleted = db.query(Budget).filter(Budget.user_id == user_id).delete(synchronize_session=False)
+    db.commit()
+    return {"Message": "All budgets deleted", "count": deleted}
+
+
 @router.delete("/{budget_id}")
 def delete_budget(budget_id: int, user_id: str = Depends(get_current_user), db: Session = Depends(get_db)):
     filtered_budget = db.query(Budget).filter(Budget.user_id == user_id,Budget.id == budget_id).first()

@@ -63,6 +63,262 @@ function formatPeriodRange(
   return `${formatDM(period_start)} – ${formatDM(end)}`;
 }
 
+// Tracks viewport against the Tailwind `sm` breakpoint so the card-tap modal
+// only wires up on mobile. matchMedia avoids a render storm on resize.
+function useIsMobile(query = "(max-width: 1023px)") {
+  const [matches, setMatches] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia(query).matches
+      : false,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [query]);
+  return matches;
+}
+
+// ─── BudgetDetailModal ────────────────────────────────────────────────────────
+
+type BudgetDetailModalProps = {
+  open: boolean;
+  budget: any | null;
+  emoji: string;
+  baseCurrency: string;
+  statusLabel: string;
+  statusPillClass: string;
+  statusBarColor: string;
+  periodLabel: string;
+  periodRange: string;
+  onClose: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+};
+
+function BudgetDetailModal({
+  open,
+  budget,
+  emoji,
+  baseCurrency,
+  statusLabel,
+  statusPillClass,
+  statusBarColor,
+  periodLabel,
+  periodRange,
+  onClose,
+  onEdit,
+  onDelete,
+}: BudgetDetailModalProps) {
+  const { t } = useTranslation();
+  const [rendered, setRendered] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Hold onto the last non-null budget so closing animations still have data to render.
+  const lastBudgetRef = useRef<any | null>(budget);
+  if (budget) lastBudgetRef.current = budget;
+  const display = budget ?? lastBudgetRef.current;
+
+  useEffect(() => {
+    if (open) {
+      setRendered(true);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setVisible(true));
+      });
+    } else {
+      setVisible(false);
+      const t = setTimeout(() => setRendered(false), 250);
+      return () => clearTimeout(t);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [open, onClose]);
+
+  useEffect(() => {
+    if (!visible || !panelRef.current) return;
+    const focusable = panelRef.current.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    first?.focus();
+
+    function trapFocus(e: KeyboardEvent) {
+      if (e.key !== "Tab") return;
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
+      }
+    }
+    document.addEventListener("keydown", trapFocus);
+    return () => document.removeEventListener("keydown", trapFocus);
+  }, [visible]);
+
+  if (!rendered || !display) return null;
+
+  const pct = Math.min(display.percentage ?? 0, 100);
+  const saved = Math.max(0, (display.limit ?? 0) - (display.spent ?? 0));
+  const isOver = (display.spent ?? 0) > (display.limit ?? 0);
+
+  return (
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${
+        visible ? "opacity-100" : "opacity-0 pointer-events-none"
+      }`}
+    >
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Panel */}
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("budget.detail.title")}
+        className={`relative w-full max-w-md bg-white dark:bg-[var(--bg-surface)] rounded-2xl shadow-2xl border border-gray-200 dark:border-[var(--bd)] transition-all duration-200 ${
+          visible ? "scale-100 translate-y-0" : "scale-95 translate-y-4"
+        }`}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-[var(--bd)] gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-10 h-10 shrink-0 rounded-lg bg-gray-100 dark:bg-[var(--bg-muted)] flex items-center justify-center text-2xl leading-none select-none">
+              {emoji}
+            </div>
+            <h2 className="text-base font-bold text-gray-900 dark:text-white break-words">
+              {display.category}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-[#555] hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[var(--bg-hover)] transition-colors"
+            aria-label={t("budget.detail.closeAriaLabel")}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-5 space-y-4">
+          {/* Period */}
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-gray-400 dark:text-[#666] mb-1 font-semibold">
+              {t("budget.detail.periodLabel")}
+            </p>
+            <p className="text-sm text-gray-700 dark:text-[#e0e0e0]">
+              {periodLabel}
+              {periodRange && (
+                <>
+                  <span className="text-gray-300 dark:text-[#555] mx-2">·</span>
+                  <span className="tabular-nums text-gray-500 dark:text-[#a0a0a0]">
+                    {periodRange}
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
+
+          {/* Status */}
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-gray-400 dark:text-[#666] mb-1 font-semibold">
+              {t("budget.detail.statusLabel")}
+            </p>
+            <span
+              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${statusPillClass}`}
+            >
+              {statusLabel}
+            </span>
+          </div>
+
+          {/* Amounts */}
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-gray-400 dark:text-[#666] mb-1 font-semibold">
+              {t("budget.detail.amountsLabel")}
+            </p>
+            <p className="text-lg font-bold text-gray-900 dark:text-white tabular-nums">
+              {formatCurrency(display.spent, baseCurrency)}
+              <span className="text-gray-400 dark:text-[#555] text-base mx-1.5 font-normal">
+                /
+              </span>
+              <span className="text-gray-500 dark:text-[#a0a0a0] font-semibold">
+                {formatCurrency(display.limit, baseCurrency)}
+              </span>
+            </p>
+          </div>
+
+          {/* Progress bar */}
+          <div>
+            <div className="w-full h-2 bg-gray-100 dark:bg-[var(--bg-muted)] rounded-full overflow-hidden">
+              <div
+                className={`${statusBarColor} h-full rounded-full transition-all duration-500`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <div className="mt-1.5 flex justify-between items-baseline text-xs tabular-nums">
+              <span
+                className={`font-semibold ${
+                  isOver
+                    ? "text-red-500 dark:text-red-400"
+                    : "text-emerald-600 dark:text-emerald-400"
+                }`}
+              >
+                {t("budget.savedLabel")} {formatCurrency(saved, baseCurrency)}
+              </span>
+              <span className="text-gray-400 dark:text-[#555]">
+                {display.percentage?.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="pt-2 space-y-2">
+            <button
+              type="button"
+              onClick={onEdit}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors"
+            >
+              <Pencil className="w-4 h-4" />
+              {t("budget.detail.editBtn")}
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              {t("budget.detail.deleteBtn")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Budget() {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -83,13 +339,25 @@ function Budget() {
     month: t("budget.periodMonthly"),
     monthly: t("budget.periodMonthly"),
   };
+  const isMobile = useIsMobile();
+  const [selectedBudget, setSelectedBudget] = useState<any | null>(null);
   const [editId, setEditId] = useState<number | null>(null);
   const [budgets, setBudgets] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   // Form fields
   const [category, setCategory] = useState("");
   const [limit, setLimit] = useState("");
-  const [period, setPeriod] = useState("");
+  // Pre-select the user's preferred default period (Settings → Budget & Goals).
+  // Map the Settings vocab (daily/weekly/monthly) to the API vocab (day/week/month).
+  const defaultPeriodPref =
+    user?.user_metadata?.budget_defaults?.default_period;
+  const defaultPeriod = (() => {
+    if (defaultPeriodPref === "daily") return "day";
+    if (defaultPeriodPref === "weekly") return "week";
+    if (defaultPeriodPref === "monthly") return "month";
+    return "";
+  })();
+  const [period, setPeriod] = useState(defaultPeriod);
   const [baseCurrency, setBaseCurrency] = useState<string>("USD");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -197,7 +465,7 @@ function Budget() {
     setEditId(null);
     setLimit("");
     setCategory("");
-    setPeriod("");
+    setPeriod(defaultPeriod);
     setFieldErrors({});
   }
 
@@ -287,6 +555,27 @@ function Budget() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function handleModalEdit() {
+    if (!selectedBudget) return;
+    handleEdit(selectedBudget);
+    setSelectedBudget(null);
+  }
+
+  async function handleModalDelete() {
+    if (!selectedBudget) return;
+    const ok = await confirm({
+      title: t("budget.detail.deleteConfirmTitle"),
+      message: t("budget.detail.deleteConfirmMessage", {
+        category: selectedBudget.category,
+      }),
+      confirmLabel: t("common.delete"),
+      danger: true,
+    });
+    if (!ok) return;
+    await handleDelete(selectedBudget.id);
+    setSelectedBudget(null);
+  }
+
   async function handleAddCategory() {
     if (!newCategoryName.trim()) return;
     setSubmittingCategory(true);
@@ -348,7 +637,9 @@ function Budget() {
       );
       const txData = await txRes.json();
       const relatedTx = txData.filter((t: any) => t.category === cat.name);
-      const relatedBudgets = budgets.filter((b: any) => b.category === cat.name);
+      const relatedBudgets = budgets.filter(
+        (b: any) => b.category === cat.name,
+      );
 
       const txCount = relatedTx.length;
       const budgetCount = relatedBudgets.length;
@@ -626,9 +917,13 @@ function Budget() {
                             <input
                               ref={newCategoryInputRef}
                               type="text"
-                              placeholder={t("transactions.categoryNamePlaceholder")}
+                              placeholder={t(
+                                "transactions.categoryNamePlaceholder",
+                              )}
                               value={newCategoryName}
-                              onChange={(e) => setNewCategoryName(e.target.value)}
+                              onChange={(e) =>
+                                setNewCategoryName(e.target.value)
+                              }
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") handleAddCategory();
                                 if (e.key === "Escape") {
@@ -641,7 +936,9 @@ function Budget() {
                             <button
                               type="button"
                               onClick={handleAddCategory}
-                              disabled={submittingCategory || !newCategoryName.trim()}
+                              disabled={
+                                submittingCategory || !newCategoryName.trim()
+                              }
                               className="px-2.5 py-1.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-xs font-semibold disabled:opacity-50 hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors"
                             >
                               {submittingCategory ? (
@@ -697,7 +994,9 @@ function Budget() {
                         : "text-gray-400 dark:text-[#555]"
                   }`}
               >
-                {period ? periodLabel[period] ?? period : t("budget.selectPeriod")}
+                {period
+                  ? (periodLabel[period] ?? period)
+                  : t("budget.selectPeriod")}
                 <ChevronDown
                   className={`w-3.5 h-3.5 transition-transform duration-150 ${
                     showPeriodDropdown ? "rotate-180" : ""
@@ -784,18 +1083,41 @@ function Budget() {
         style={{ maxHeight: "calc(100vh - 360px)", minHeight: "200px" }}
       >
         {budgets.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-1">
+          <div className="grid grid-cols-1 min-[1400px]:grid-cols-2 gap-4 pb-1">
             {budgets.map((budget) => {
               const pct = Math.min(budget.percentage ?? 0, 100);
-              const barColor =
-                statusBarColor[budget.status] ?? "bg-gray-400";
+              const barColor = statusBarColor[budget.status] ?? "bg-gray-400";
               return (
                 <div
                   key={budget.id}
-                  className="bg-white dark:bg-[var(--bg-surface)] rounded-xl border border-gray-200 dark:border-[var(--bd)] shadow-sm p-3"
+                  onClick={
+                    isMobile ? () => setSelectedBudget(budget) : undefined
+                  }
+                  onKeyDown={
+                    isMobile
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedBudget(budget);
+                          }
+                        }
+                      : undefined
+                  }
+                  role={isMobile ? "button" : undefined}
+                  tabIndex={isMobile ? 0 : undefined}
+                  aria-label={
+                    isMobile
+                      ? `${budget.category} – ${t("budget.detail.title")}`
+                      : undefined
+                  }
+                  className={`bg-white dark:bg-[var(--bg-surface)] rounded-xl border border-gray-200 dark:border-[var(--bd)] shadow-sm p-3 ${
+                    isMobile
+                      ? "cursor-pointer active:bg-gray-50 dark:active:bg-[var(--bg-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:focus-visible:ring-[#e8643a]/40"
+                      : ""
+                  }`}
                 >
                   {/* ── Single row: emoji · name/period · status · amounts · actions ── */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 lg:gap-2 min-w-0">
                     {/* Emoji icon (looked up from category) */}
                     <div className="w-9 h-9 shrink-0 rounded-lg bg-gray-100 dark:bg-[var(--bg-muted)] flex items-center justify-center text-xl leading-none select-none">
                       {emojiByCategory[budget.category?.toLowerCase()] || "💼"}
@@ -803,19 +1125,23 @@ function Budget() {
 
                     {/* Name + period (with date range) */}
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-gray-900 dark:text-white truncate leading-snug">
+                      <p className="text-sm font-bold text-gray-900 dark:text-white truncate leading-snug max-w-[140px] lg:max-w-none">
                         {budget.category}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-[#a0a0a0] flex items-center gap-1.5">
-                        <span>{periodLabel[budget.period] ?? budget.period}</span>
+                      <p className="text-xs text-gray-500 dark:text-[#a0a0a0] flex items-center gap-1.5 min-w-0">
+                        <span className="shrink-0 whitespace-nowrap">
+                          {periodLabel[budget.period] ?? budget.period}
+                        </span>
                         {formatPeriodRange(
                           budget.period,
                           budget.period_start,
                           budget.period_end,
                         ) && (
                           <>
-                            <span className="text-gray-300 dark:text-[#555]">·</span>
-                            <span className="text-[11px] text-gray-400 dark:text-[#666] tabular-nums">
+                            <span className="shrink-0 text-gray-300 dark:text-[#555]">
+                              ·
+                            </span>
+                            <span className="min-w-0 truncate text-[11px] text-gray-400 dark:text-[#666] tabular-nums">
                               {formatPeriodRange(
                                 budget.period,
                                 budget.period_start,
@@ -827,9 +1153,9 @@ function Budget() {
                       </p>
                     </div>
 
-                    {/* Status pill */}
+                    {/* Status pill (desktop only — mobile copy lives in the bottom row) */}
                     <span
-                      className={`hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 ${
+                      className={`hidden lg:inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 ${
                         statusPillClass[budget.status] ??
                         "bg-gray-100 dark:bg-[var(--bg-muted)] text-gray-600 dark:text-[#a0a0a0]"
                       }`}
@@ -839,30 +1165,38 @@ function Budget() {
 
                     {/* Amounts */}
                     <div className="flex items-baseline gap-1 shrink-0">
-                      <span className="text-sm font-bold text-gray-900 dark:text-white tabular-nums">
+                      <span className="text-xs lg:text-sm font-bold text-gray-900 dark:text-white tabular-nums">
                         {formatCurrency(budget.spent, baseCurrency)}
                       </span>
-                      <span className="text-gray-400 dark:text-[#555] text-xs">/</span>
-                      <span className="text-xs text-gray-500 dark:text-[#a0a0a0] tabular-nums">
+                      <span className="text-gray-400 dark:text-[#555] text-[10px] lg:text-xs">
+                        /
+                      </span>
+                      <span className="text-[11px] lg:text-xs text-gray-500 dark:text-[#a0a0a0] tabular-nums">
                         {formatCurrency(budget.limit, baseCurrency)}
                       </span>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex gap-0.5 shrink-0">
+                    {/* Actions (desktop only — mobile moves these into the detail modal) */}
+                    <div className="hidden lg:flex gap-0.5 shrink-0">
                       <button
-                        onClick={() => handleEdit(budget)}
-                        className="p-1.5 rounded-md text-gray-400 dark:text-[#666] hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[var(--bg-hover)] transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(budget);
+                        }}
+                        className="p-1 lg:p-1.5 rounded-md text-gray-400 dark:text-[#666] hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[var(--bg-hover)] transition-colors"
                         aria-label="Edit budget"
                       >
-                        <Pencil className="w-3.5 h-3.5" />
+                        <Pencil className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
                       </button>
                       <button
-                        onClick={() => handleDelete(budget.id)}
-                        className="p-1.5 rounded-md text-red-400 dark:text-red-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(budget.id);
+                        }}
+                        className="p-1 lg:p-1.5 rounded-md text-red-400 dark:text-red-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
                         aria-label="Delete budget"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -875,8 +1209,17 @@ function Budget() {
                     />
                   </div>
 
-                  {/* Percentage + saved label */}
+                  {/* Status pill (mobile) · Percentage + saved label */}
                   <div className="mt-0.5 flex justify-end items-baseline gap-1.5">
+                    {/* Status pill — mobile only, pinned to the left */}
+                    <span
+                      className={`lg:hidden mr-auto inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${
+                        statusPillClass[budget.status] ??
+                        "bg-gray-100 dark:bg-[var(--bg-muted)] text-gray-600 dark:text-[#a0a0a0]"
+                      }`}
+                    >
+                      {statusLabel[budget.status] ?? budget.status}
+                    </span>
                     <span className="text-xs text-gray-400 dark:text-[#555] tabular-nums">
                       {budget.percentage?.toFixed(1)}%
                     </span>
@@ -891,8 +1234,6 @@ function Budget() {
                       const savedFormatted = new Intl.NumberFormat("en-US", {
                         style: "currency",
                         currency: baseCurrency,
-                        minimumFractionDigits: 1,
-                        maximumFractionDigits: 1,
                       }).format(saved);
                       const isZero = saved <= 0;
                       return (
@@ -929,6 +1270,51 @@ function Budget() {
           </div>
         )}
       </div>
+
+      {/* Mobile-only budget detail modal */}
+      <BudgetDetailModal
+        open={selectedBudget !== null}
+        budget={selectedBudget}
+        emoji={
+          selectedBudget
+            ? emojiByCategory[selectedBudget.category?.toLowerCase()] || "💼"
+            : "💼"
+        }
+        baseCurrency={baseCurrency}
+        statusLabel={
+          selectedBudget
+            ? (statusLabel[selectedBudget.status] ?? selectedBudget.status)
+            : ""
+        }
+        statusPillClass={
+          selectedBudget
+            ? (statusPillClass[selectedBudget.status] ??
+              "bg-gray-100 dark:bg-[var(--bg-muted)] text-gray-600 dark:text-[#a0a0a0]")
+            : ""
+        }
+        statusBarColor={
+          selectedBudget
+            ? (statusBarColor[selectedBudget.status] ?? "bg-gray-400")
+            : "bg-gray-400"
+        }
+        periodLabel={
+          selectedBudget
+            ? (periodLabel[selectedBudget.period] ?? selectedBudget.period)
+            : ""
+        }
+        periodRange={
+          selectedBudget
+            ? formatPeriodRange(
+                selectedBudget.period,
+                selectedBudget.period_start,
+                selectedBudget.period_end,
+              )
+            : ""
+        }
+        onClose={() => setSelectedBudget(null)}
+        onEdit={handleModalEdit}
+        onDelete={handleModalDelete}
+      />
     </div>
   );
 }

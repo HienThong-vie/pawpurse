@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Outlet, useNavigate, NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -17,6 +17,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationContext";
 import supabase from "../lib/supabaseClient";
 import NotificationPanel from "./NotificationPanel";
+import RatingPopup from "./RatingPopup";
 
 const SIDEBAR_ROUTES: Record<string, string> = {
   "/dashboard": "sidebar.dashboard",
@@ -36,6 +37,14 @@ function Layout() {
 
   const sidebarKey = SIDEBAR_ROUTES[location.pathname];
   const showSidebar = Boolean(sidebarKey);
+
+  const rawAvatarUrl = user?.user_metadata?.avatar_url as string | undefined;
+  const avatarUrl = useMemo(
+    () => (rawAvatarUrl ? `${rawAvatarUrl}?t=${Date.now()}` : null),
+    [rawAvatarUrl],
+  );
+  const avatarInitial =
+    user?.user_metadata?.username?.[0]?.toUpperCase() ?? "U";
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -120,12 +129,29 @@ function Layout() {
         </nav>
 
         <div className="border-t border-gray-300 dark:border-[var(--bd)] pt-4 mt-4">
-          <p className="text-sm font-bold text-gray-900 dark:text-white px-2 truncate">
-            {username}
-          </p>
-          <p className="text-gray-500 dark:text-[#a0a0a0] text-xs px-2 mb-2 truncate">
-            {user?.email}
-          </p>
+          <div className="flex items-center gap-3 px-2 mb-2">
+            <div className="w-8 h-8 rounded-full shrink-0 overflow-hidden bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-sm font-bold text-emerald-600 dark:text-[#e8643a]">
+                  {avatarInitial}
+                </span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-gray-900 dark:text-white truncate leading-tight">
+                {username}
+              </p>
+              <p className="text-gray-500 dark:text-[#a0a0a0] text-xs truncate leading-tight">
+                {user?.email}
+              </p>
+            </div>
+          </div>
           <ul className="flex flex-col gap-0.5 mb-1" onClick={closeSidebar}>
             <li>
               <NavLink to="/settings" className={navLinkClass}>
@@ -198,6 +224,7 @@ function Layout() {
       </main>
 
       <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
+      <RatingPopup />
     </div>
   );
 }

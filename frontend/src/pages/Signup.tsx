@@ -37,6 +37,7 @@ function Signup() {
     }
     setSubmitting(true);
     try {
+      try { sessionStorage.setItem("smartfinance.newSignup", "1"); } catch { /* ignore */ }
       const { error } = await supabase.auth.signUp({
         email,
         password,
