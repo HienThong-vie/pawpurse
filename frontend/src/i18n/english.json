@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Smart Finance Tracker",
+    "appName": "Pawpurse",
     "userFallback": "User",
     "save": "Save",
     "saving": "Saving...",
@@ -19,6 +19,7 @@
     "budget": "Budget",
     "goals": "Goals",
     "advisor": "Advisor",
+    "companion": "Companion",
     "notifications": "Notifications",
     "settings": "Settings",
     "signOut": "Sign out"
@@ -178,7 +179,53 @@
     "starterCard3Title": "Where can I save more?",
     "starterCard3Sub": "View Insights",
     "messages": "{{count}} message",
-    "messages_plural": "{{count}} messages"
+    "messages_plural": "{{count}} messages",
+    "warnModalTitle": "Heads up",
+    "warnModalBody": "You've used {{used}} of {{limit}} AI chats this week. Use the rest wisely!",
+    "limitModalTitle": "Weekly limit reached",
+    "limitModalBody": "You've used all {{limit}} AI chats this week. Your limit resets on {{date}}.",
+    "modalDismiss": "Got it",
+    "menuPin": "Pin",
+    "menuUnpin": "Unpin",
+    "menuRename": "Rename",
+    "menuDelete": "Delete",
+    "deleteChatTitle": "Delete this chat?",
+    "deleteChatMessage": "\"{{title}}\" and all its messages will be permanently removed.",
+    "deleteChatConfirm": "Delete",
+    "errorGeneric": "Couldn't get a response. Try again in a moment.",
+    "toolBudgetCreated": "Created a {{period}} budget for {{category}}.",
+    "toolTransactionCreated": "Recorded {{type}} of {{amount}} for {{category}}."
+  },
+  "companion": {
+    "title": "Companion",
+    "subtitle": "Take care of your PawPurse buddy",
+    "coinsLabel": "coins",
+    "currentBed": "Current bed",
+    "shopTitle": "Pet Bed Shop",
+    "costFree": "Free",
+    "costCoins": "🪙 {{cost}} coins",
+    "buyBtn": "Buy",
+    "equipBtn": "Equip",
+    "equippedBadge": "Equipped",
+    "buying": "Buying...",
+    "equipping": "Equipping...",
+    "earnHint": "Earn coins by saving on your budgets each period 🪙",
+    "buyToast": "You got {{name}}! 🎉",
+    "equipToast": "{{name}} equipped!",
+    "buyError": "Couldn't complete purchase.",
+    "equipError": "Couldn't equip that bed.",
+    "loadError": "Couldn't load your companion. Try again.",
+    "beds": {
+      "default": "Simple Mat",
+      "blue_cushion": "Blue Cushion",
+      "pink_pillow": "Pink Pillow",
+      "royal_bed": "Royal Bed",
+      "space_pod": "Space Pod",
+      "nature_nest": "Nature Nest"
+    }
+  },
+  "sleepingMascot": {
+    "tooltip": "{{name}}'s bed"
   },
   "notifications": {
     "title": "Notifications",
@@ -318,7 +365,7 @@
   },
   "ratingPopup": {
     "title": "How was your experience?",
-    "subtitle": "Your feedback helps us make Smart Finance Tracker better.",
+    "subtitle": "Your feedback helps us make Pawpurse better.",
     "commentPlaceholder": "Any comments? (optional)",
     "submit": "Submit",
     "maybeLater": "Maybe later",
@@ -365,5 +412,21 @@
     "errorEnterEmail": "Please enter your email",
     "errorUsernameTooShort": "Username must be 2–30 characters",
     "errorUsernameInvalid": "Username can only contain letters, numbers, underscores, and spaces"
+  },
+  "setup": {
+    "welcome": "Welcome to PawPurse!",
+    "welcomeSub": "Let's get you set up. What language do you prefer?",
+    "currency": "Choose your currency",
+    "currencySub": "We'll use this to display your amounts",
+    "companion": "Pick your companion",
+    "companionSub": "They'll grow as you save and guide you through PawPurse",
+    "companionName": "Name your {{companion}}",
+    "companionNameSub": "What should we call them?",
+    "catDesc": "Independent & mysterious",
+    "dogDesc": "Loyal & enthusiastic",
+    "continue": "Continue",
+    "back": "Back",
+    "finish": "Finish",
+    "welcomeToast": "Welcome! Your companion is ready."
   }
 }

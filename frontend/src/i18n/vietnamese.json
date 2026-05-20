@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Smart Finance Tracker",
+    "appName": "Pawpurse",
     "userFallback": "Người dùng",
     "save": "Lưu",
     "saving": "Đang lưu...",
@@ -19,6 +19,7 @@
     "budget": "Ngân sách",
     "goals": "Mục tiêu",
     "advisor": "Gợi ý",
+    "companion": "Bạn đồng hành",
     "notifications": "Thông báo",
     "settings": "Cài đặt",
     "signOut": "Đăng xuất"
@@ -177,7 +178,53 @@
     "starterCard2Sub": "Phân tích ngân sách",
     "starterCard3Title": "Tôi có thể tiết kiệm thêm ở đâu?",
     "starterCard3Sub": "Xem chi tiết",
-    "messages": "{{count}} tin nhắn"
+    "messages": "{{count}} tin nhắn",
+    "warnModalTitle": "Lưu ý",
+    "warnModalBody": "Bạn đã dùng {{used}}/{{limit}} lượt trò chuyện AI tuần này. Hãy dùng phần còn lại hợp lý nhé!",
+    "limitModalTitle": "Đã đạt giới hạn tuần",
+    "limitModalBody": "Bạn đã dùng hết {{limit}} lượt trò chuyện AI tuần này. Giới hạn sẽ đặt lại vào {{date}}.",
+    "modalDismiss": "Đã hiểu",
+    "menuPin": "Ghim",
+    "menuUnpin": "Bỏ ghim",
+    "menuRename": "Đổi tên",
+    "menuDelete": "Xóa",
+    "deleteChatTitle": "Xóa cuộc trò chuyện này?",
+    "deleteChatMessage": "\"{{title}}\" và toàn bộ tin nhắn sẽ bị xóa vĩnh viễn.",
+    "deleteChatConfirm": "Xóa",
+    "errorGeneric": "Không nhận được phản hồi. Vui lòng thử lại.",
+    "toolBudgetCreated": "Đã tạo ngân sách {{period}} cho {{category}}.",
+    "toolTransactionCreated": "Đã ghi nhận {{type}} {{amount}} cho {{category}}."
+  },
+  "companion": {
+    "title": "Bạn đồng hành",
+    "subtitle": "Chăm sóc người bạn PawPurse của bạn",
+    "coinsLabel": "xu",
+    "currentBed": "Giường hiện tại",
+    "shopTitle": "Cửa hàng giường thú cưng",
+    "costFree": "Miễn phí",
+    "costCoins": "🪙 {{cost}} xu",
+    "buyBtn": "Mua",
+    "equipBtn": "Trang bị",
+    "equippedBadge": "Đang dùng",
+    "buying": "Đang mua...",
+    "equipping": "Đang trang bị...",
+    "earnHint": "Nhận xu khi tiết kiệm được ngân sách trong mỗi kỳ 🪙",
+    "buyToast": "Bạn đã có {{name}}! 🎉",
+    "equipToast": "Đã trang bị {{name}}!",
+    "buyError": "Không thể hoàn tất giao dịch.",
+    "equipError": "Không thể trang bị giường này.",
+    "loadError": "Không thể tải bạn đồng hành. Vui lòng thử lại.",
+    "beds": {
+      "default": "Thảm đơn giản",
+      "blue_cushion": "Đệm xanh",
+      "pink_pillow": "Gối hồng",
+      "royal_bed": "Giường hoàng gia",
+      "space_pod": "Khoang vũ trụ",
+      "nature_nest": "Tổ thiên nhiên"
+    }
+  },
+  "sleepingMascot": {
+    "tooltip": "Giường của {{name}}"
   },
   "notifications": {
     "title": "Thông báo",
@@ -364,5 +411,21 @@
     "errorEnterEmail": "Vui lòng nhập email của bạn",
     "errorUsernameTooShort": "Tên người dùng phải từ 2–30 ký tự",
     "errorUsernameInvalid": "Tên người dùng chỉ được chứa chữ cái, số, dấu gạch dưới và khoảng trắng"
+  },
+  "setup": {
+    "welcome": "Chào mừng đến với PawPurse!",
+    "welcomeSub": "Hãy thiết lập tài khoản của bạn. Bạn thích ngôn ngữ nào?",
+    "currency": "Chọn đơn vị tiền tệ",
+    "currencySub": "Chúng tôi sẽ dùng đơn vị này để hiển thị số tiền của bạn",
+    "companion": "Chọn người bạn đồng hành",
+    "companionSub": "Họ sẽ lớn lên khi bạn tiết kiệm và hướng dẫn bạn trong PawPurse",
+    "companionName": "Đặt tên cho {{companion}} của bạn",
+    "companionNameSub": "Chúng ta sẽ gọi họ là gì?",
+    "catDesc": "Độc lập & bí ẩn",
+    "dogDesc": "Trung thành & nhiệt tình",
+    "continue": "Tiếp tục",
+    "back": "Quay lại",
+    "finish": "Hoàn thành",
+    "welcomeToast": "Chào mừng! Người bạn đồng hành của bạn đã sẵn sàng."
   }
 }
