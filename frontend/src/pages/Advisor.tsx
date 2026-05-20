@@ -9,6 +9,10 @@ import {
   ArrowUp,
   X,
   Clock,
+  MoreVertical,
+  Pin,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
@@ -90,6 +94,58 @@ function InputBar({
   );
 }
 
+function UsageModal({
+  variant,
+  used,
+  limit,
+  resetDate,
+  onClose,
+}: {
+  variant: "warning" | "limit";
+  used: number;
+  limit: number;
+  resetDate: string;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const isLimit = variant === "limit";
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-sm bg-white dark:bg-[var(--bg-surface)] border border-gray-200 dark:border-[var(--bd)] rounded-2xl shadow-xl p-6 text-center">
+        <div
+          className={`w-12 h-12 rounded-2xl mx-auto flex items-center justify-center mb-4 ${
+            isLimit
+              ? "bg-red-50 dark:bg-red-500/10"
+              : "bg-amber-50 dark:bg-amber-500/10"
+          }`}
+        >
+          <AlertCircle
+            className={`w-6 h-6 ${
+              isLimit
+                ? "text-red-500 dark:text-red-400"
+                : "text-amber-500 dark:text-amber-400"
+            }`}
+          />
+        </div>
+        <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1.5">
+          {isLimit ? t("advisor.limitModalTitle") : t("advisor.warnModalTitle")}
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-[#a0a0a0] mb-5">
+          {isLimit
+            ? t("advisor.limitModalBody", { limit, date: resetDate })
+            : t("advisor.warnModalBody", { used, limit })}
+        </p>
+        <button
+          onClick={onClose}
+          className="w-full py-2.5 rounded-xl bg-emerald-500 dark:bg-[#e8643a] text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors"
+        >
+          {t("advisor.modalDismiss")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Advisor() {
   const { t } = useTranslation();
   const { user, username } = useAuth();
@@ -160,6 +216,7 @@ function Advisor() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [usage, setUsage] = useState<Usage | null>(null);
+  const [modal, setModal] = useState<"warning" | "limit" | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const emptyInputRef = useRef<HTMLInputElement>(null);
 
@@ -206,6 +263,24 @@ function Advisor() {
     };
   }, [user?.id]);
 
+  // Open warning / limit popups based on usage
+  useEffect(() => {
+    if (!usage || !user?.id) return;
+    if (usage.uses_this_week >= usage.limit) {
+      setModal("limit");
+    } else if (usage.uses_this_week >= 6) {
+      const key = `advisor_warn_shown_${user.id}`;
+      try {
+        if (!sessionStorage.getItem(key)) {
+          setModal("warning");
+          sessionStorage.setItem(key, "1");
+        }
+      } catch {
+        /* sessionStorage unavailable — skip the once-per-session guard */
+      }
+    }
+  }, [usage, user?.id]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chats, thinking, activeChatId]);
@@ -219,19 +294,6 @@ function Advisor() {
   const resetsAt = usage?.resets_at
     ? new Date(usage.resets_at).toLocaleDateString()
     : "";
-
-  let usageBannerClass = "text-gray-400 dark:text-[#666]";
-  let usageMessage = t("advisor.usageCounter", { used, limit });
-  if (limitReached) {
-    usageBannerClass = "text-red-600 dark:text-red-400";
-    usageMessage = t("advisor.limitReached", { date: resetsAt });
-  } else if (used >= 8) {
-    usageBannerClass = "text-orange-600 dark:text-orange-400";
-    usageMessage = t("advisor.warningAt8", { used, limit });
-  } else if (used >= 6) {
-    usageBannerClass = "text-amber-600 dark:text-amber-400";
-    usageMessage = t("advisor.warningAt6", { used, limit });
-  }
 
   function handleNewChat() {
     const newChat: Chat = {
@@ -323,14 +385,13 @@ function Advisor() {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err ?? "");
       if (message.includes("429")) {
-        // Refresh usage so the banner switches to limitReached
+        // Refresh usage so the limit popup fires via the usage effect
         try {
           const u = await apiFetch("http://localhost:8000/advisor/usage");
           setUsage(await u.json());
         } catch {
           /* ignore */
         }
-        toast.error(t("advisor.limitReached", { date: resetsAt || "" }));
       } else {
         toast.error(t("advisor.errorGeneric"));
       }
@@ -498,7 +559,6 @@ function Advisor() {
           </div>
 
           <InputBar {...inputProps} inputRef={emptyInputRef} />
-          <p className={`text-xs mt-3 ${usageBannerClass}`}>{usageMessage}</p>
         </div>
 
         {/* Active state */}
@@ -553,12 +613,19 @@ function Advisor() {
 
           <div className="shrink-0 px-4 py-3 bg-white dark:bg-[var(--bg-page)]">
             <InputBar {...inputProps} />
-            <p className={`text-xs mt-2 text-center ${usageBannerClass}`}>
-              {usageMessage}
-            </p>
           </div>
         </div>
       </div>
+
+      {modal && (
+        <UsageModal
+          variant={modal}
+          used={used}
+          limit={limit}
+          resetDate={resetsAt}
+          onClose={() => setModal(null)}
+        />
+      )}
     </div>
   );
 }
