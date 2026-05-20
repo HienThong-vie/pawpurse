@@ -1,5 +1,6 @@
 import json
 import re
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
@@ -64,44 +65,62 @@ def _build_context(db: Session, user_id: str) -> dict:
     settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
     base_currency = settings.base_currency if settings else "USD"
 
-    transactions = (
+    # Fetch up to 50 recent transactions for aggregation; send a category
+    # summary (covers the full history) plus the 5 most recent raw rows
+    # (covers specific recent-activity questions) — far fewer tokens than
+    # sending 10 raw objects while giving the AI more analytical data.
+    all_tx = (
         db.query(Transaction)
         .filter(Transaction.user_id == user_id)
         .order_by(Transaction.created_at.desc())
-        .limit(10)
+        .limit(50)
         .all()
     )
     budgets = db.query(Budget).filter(Budget.user_id == user_id).all()
     goals = db.query(Goal).filter(Goal.user_id == user_id).all()
 
-    tx_summary = [
+    # Aggregate by category across all fetched transactions
+    totals: dict = defaultdict(lambda: {"income": 0.0, "expense": 0.0, "count": 0})
+    for t in all_tx:
+        cat = t.category or "Uncategorized"
+        tx_type = t.type or "expense"
+        totals[cat][tx_type] = round(totals[cat][tx_type] + float(t.amount or 0), 2)
+        totals[cat]["count"] += 1
+    spending_by_category = {
+        cat: {k: v for k, v in data.items() if k == "count" or v != 0.0}
+        for cat, data in totals.items()
+    }
+
+    recent_5 = [
         {
-            "amount": t.amount,
+            "amount": round(float(t.amount), 2),
             "type": t.type,
             "category": t.category,
             "note": t.note,
-            "date": t.date.isoformat() if t.date else None,
-            "currency": t.currency or "USD",
+            "date": t.date.strftime("%Y-%m-%d") if t.date else None,
         }
-        for t in transactions
+        for t in all_tx[:5]
     ]
+
+    # Strip currency from budgets/goals — base_currency is already in the prompt
     budget_summary = [
-        {"category": b.category, "limit": b.limit, "period": b.period, "currency": b.currency}
+        {"category": b.category, "limit": round(float(b.limit), 2), "period": b.period}
         for b in budgets
     ]
     goal_summary = [
         {
             "name": g.name,
-            "target": g.target_amount,
-            "current": g.current_amount,
-            "deadline": g.deadline.isoformat() if g.deadline else None,
-            "currency": g.currency,
+            "target": round(float(g.target_amount), 2),
+            "saved": round(float(g.current_amount), 2),
+            "deadline": g.deadline.strftime("%Y-%m-%d") if g.deadline else None,
         }
         for g in goals
     ]
+
     return {
         "base_currency": base_currency,
-        "transactions": tx_summary,
+        "spending_by_category": spending_by_category,
+        "recent_transactions": recent_5,
         "budgets": budget_summary,
         "goals": goal_summary,
     }
@@ -135,13 +154,26 @@ def _build_system_prompt(mascot: Mascot, context: dict) -> str:
         f"'end of the year', 'next month', or 'tomorrow', resolve it relative to "
         f"today's date and pass the result as a YYYY-MM-DD string.\n"
         f"\n"
-        f"The user's financial data:\n"
-        f"- Base currency: {context['base_currency']}\n"
-        f"- Recent transactions: {json.dumps(context['transactions'])}\n"
+        f"The user's financial data (all amounts in {context['base_currency']}):\n"
+        f"- Spending by category (up to last 50 transactions): {json.dumps(context['spending_by_category'])}\n"
+        f"- Most recent 5 transactions: {json.dumps(context['recent_transactions'])}\n"
         f"- Budgets: {json.dumps(context['budgets'])}\n"
         f"- Goals: {json.dumps(context['goals'])}\n"
         f"Always give actionable advice based on the actual data above."
     )
+
+
+def _groq_http_exc(e: Exception, context: str = "") -> HTTPException:
+    """Map a Groq API error to the right HTTP exception.
+    A 429 rate-limit becomes 503 with a user-facing message so the frontend
+    can show something readable instead of a generic 502 Bad Gateway."""
+    if "429" in str(e):
+        return HTTPException(
+            status_code=503,
+            detail="The AI service is temporarily busy — please try again in a moment.",
+        )
+    label = f"Groq {context} error" if context else "Groq error"
+    return HTTPException(status_code=502, detail=f"{label}: {e}")
 
 
 def _strip_formatting(text: str) -> str:
@@ -409,7 +441,7 @@ def chat(
             # brave_search); Groq rejects the whole request with a 400
             # tool_use_failed. Retry once without tools for a plain answer.
             if "tool_use_failed" not in str(e):
-                raise HTTPException(status_code=502, detail=f"Groq error: {e}")
+                raise _groq_http_exc(e)
             try:
                 response = client.chat.completions.create(
                     model=GROQ_MODEL,
@@ -419,9 +451,7 @@ def chat(
                     timeout=30,
                 )
             except Exception as retry_err:
-                raise HTTPException(
-                    status_code=502, detail=f"Groq error: {retry_err}"
-                )
+                raise _groq_http_exc(retry_err, "retry")
 
         choice = response.choices[0]
         msg = choice.message
@@ -475,9 +505,7 @@ def chat(
                 )
                 final_message = follow_up.choices[0].message.content or ""
             except Exception as e:
-                raise HTTPException(
-                    status_code=502, detail=f"Groq follow-up error: {e}"
-                )
+                raise _groq_http_exc(e, "follow-up")
         elif getattr(msg, "tool_calls", None):
             messages.append(
                 {
@@ -522,7 +550,7 @@ def chat(
                 )
                 final_message = follow_up.choices[0].message.content or ""
             except Exception as e:
-                raise HTTPException(status_code=502, detail=f"Groq follow-up error: {e}")
+                raise _groq_http_exc(e, "follow-up")
         else:
             final_message = msg.content or ""
 
