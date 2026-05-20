@@ -17,6 +17,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import { useConfirm } from "../context/ConfirmContext";
 import { apiFetch } from "../lib/api";
 import supabase from "../lib/supabaseClient";
 
@@ -32,6 +33,7 @@ type Chat = {
   title: string;
   messages: Message[];
   createdAt: Date;
+  pinned?: boolean;
 };
 
 type Usage = {
@@ -150,6 +152,7 @@ function Advisor() {
   const { t } = useTranslation();
   const { user, username } = useAuth();
   const toast = useToast();
+  const { confirm } = useConfirm();
 
   const companionType =
     (user?.user_metadata?.companion as string | undefined) ??
@@ -217,6 +220,13 @@ function Advisor() {
   const [searchQuery, setSearchQuery] = useState("");
   const [usage, setUsage] = useState<Usage | null>(null);
   const [modal, setModal] = useState<"warning" | "limit" | null>(null);
+  const [menuChatId, setMenuChatId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(
+    null,
+  );
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const renameCancelledRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const emptyInputRef = useRef<HTMLInputElement>(null);
 
@@ -306,6 +316,63 @@ function Advisor() {
     setActiveChatId(newChat.id);
     setSearchOpen(false);
     setTimeout(() => emptyInputRef.current?.focus(), 250);
+  }
+
+  function openChatMenu(e: React.MouseEvent, chatId: string) {
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenuPos({ top: rect.bottom + 4, left: rect.right - 144 });
+    setMenuChatId(chatId);
+  }
+
+  function togglePin(chatId: string) {
+    setChats((prev) =>
+      prev.map((c) => (c.id === chatId ? { ...c, pinned: !c.pinned } : c)),
+    );
+    setMenuChatId(null);
+  }
+
+  function startRename(chat: Chat) {
+    renameCancelledRef.current = false;
+    setRenamingId(chat.id);
+    setRenameValue(chat.title);
+    setMenuChatId(null);
+  }
+
+  function commitRename() {
+    if (renameCancelledRef.current) {
+      renameCancelledRef.current = false;
+      return;
+    }
+    const id = renamingId;
+    if (!id) return;
+    const next = renameValue.trim().slice(0, 60);
+    if (next) {
+      setChats((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, title: next } : c)),
+      );
+    }
+    setRenamingId(null);
+    setRenameValue("");
+  }
+
+  function cancelRename() {
+    renameCancelledRef.current = true;
+    setRenamingId(null);
+    setRenameValue("");
+  }
+
+  async function deleteChat(chat: Chat) {
+    setMenuChatId(null);
+    const ok = await confirm({
+      title: t("advisor.deleteChatTitle"),
+      message: t("advisor.deleteChatMessage", { title: chat.title }),
+      confirmLabel: t("advisor.deleteChatConfirm"),
+      danger: true,
+    });
+    if (!ok) return;
+    setChats((prev) => prev.filter((c) => c.id !== chat.id));
+    if (activeChatId === chat.id) setActiveChatId(null);
   }
 
   async function handleSend(text?: string) {
@@ -414,14 +481,16 @@ function Advisor() {
     placeholder: t("advisor.writeMsgPlaceholder"),
   };
 
-  const filteredChats = chats.filter(
-    (c) =>
-      !searchQuery ||
-      c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.messages.some((m) =>
-        m.content.toLowerCase().includes(searchQuery.toLowerCase()),
-      ),
-  );
+  const filteredChats = chats
+    .filter(
+      (c) =>
+        !searchQuery ||
+        c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.messages.some((m) =>
+          m.content.toLowerCase().includes(searchQuery.toLowerCase()),
+        ),
+    )
+    .sort((a, b) => Number(b.pinned ?? false) - Number(a.pinned ?? false));
 
   return (
     <div className="-m-4 lg:-m-8 flex flex-col h-[calc(100dvh-2.75rem)] lg:h-dvh overflow-hidden font-[Inter]">
@@ -444,6 +513,8 @@ function Advisor() {
             onClick={() => {
               setSearchOpen((o) => !o);
               setSearchQuery("");
+              setMenuChatId(null);
+              cancelRename();
             }}
             className="p-2 rounded-lg text-gray-500 dark:text-[#a0a0a0] hover:bg-gray-100 dark:hover:bg-[var(--bg-hover)] transition-colors"
             aria-label="Search chats"
@@ -487,27 +558,117 @@ function Advisor() {
                   </p>
                 ) : (
                   filteredChats.map((c) => (
-                    <button
+                    <div
                       key={c.id}
-                      onClick={() => {
-                        setActiveChatId(c.id);
-                        setSearchOpen(false);
-                      }}
-                      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] transition-colors ${
+                      className={`group flex items-center gap-1 px-2 py-2 transition-colors ${
                         c.id === activeChatId
-                          ? "bg-emerald-50 dark:bg-[#e8643a]/10 text-emerald-700 dark:text-[#e8643a]"
-                          : "text-gray-700 dark:text-[#e0e0e0]"
+                          ? "bg-emerald-50 dark:bg-[#e8643a]/10"
+                          : "hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)]"
                       }`}
                     >
-                      <p className="font-medium truncate">{c.title}</p>
-                      <p className="text-xs text-gray-400 dark:text-[#666] mt-0.5">
-                        {t("advisor.messages", { count: c.messages.length })}
-                      </p>
-                    </button>
+                      {renamingId === c.id ? (
+                        <input
+                          autoFocus
+                          type="text"
+                          value={renameValue}
+                          maxLength={60}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onBlur={commitRename}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              commitRename();
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              cancelRename();
+                            }
+                          }}
+                          className="flex-1 min-w-0 text-sm bg-white dark:bg-[var(--bg-page)] border border-emerald-300 dark:border-[#e8643a]/50 rounded-md px-2 py-1 outline-none text-gray-900 dark:text-white"
+                        />
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setActiveChatId(c.id);
+                            setSearchOpen(false);
+                          }}
+                          className="flex-1 min-w-0 text-left px-2"
+                        >
+                          <p
+                            className={`font-medium text-sm flex items-center gap-1.5 ${
+                              c.id === activeChatId
+                                ? "text-emerald-700 dark:text-[#e8643a]"
+                                : "text-gray-700 dark:text-[#e0e0e0]"
+                            }`}
+                          >
+                            {c.pinned && (
+                              <Pin className="w-3 h-3 shrink-0 fill-current" />
+                            )}
+                            <span className="truncate">{c.title}</span>
+                          </p>
+                          <p className="text-xs text-gray-400 dark:text-[#666] mt-0.5">
+                            {t("advisor.messages", {
+                              count: c.messages.length,
+                            })}
+                          </p>
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => openChatMenu(e, c.id)}
+                        className="shrink-0 p-1.5 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[var(--bg-page)] transition-colors"
+                        aria-label="Chat options"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    </div>
                   ))
                 )}
               </div>
             </div>
+
+            {menuChatId && menuPos && (
+              <>
+                <div
+                  className="fixed inset-0 z-[55]"
+                  onClick={() => setMenuChatId(null)}
+                />
+                <div
+                  className="fixed z-[56] w-36 bg-white dark:bg-[var(--bg-surface)] border border-gray-200 dark:border-[var(--bd)] rounded-lg shadow-lg py-1"
+                  style={{ top: menuPos.top, left: menuPos.left }}
+                >
+                  {(() => {
+                    const chat = chats.find((c) => c.id === menuChatId);
+                    if (!chat) return null;
+                    return (
+                      <>
+                        <button
+                          onClick={() => togglePin(chat.id)}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-[#e0e0e0] hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] transition-colors"
+                        >
+                          <Pin className="w-3.5 h-3.5 shrink-0" />
+                          {chat.pinned
+                            ? t("advisor.menuUnpin")
+                            : t("advisor.menuPin")}
+                        </button>
+                        <button
+                          onClick={() => startRename(chat)}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-[#e0e0e0] hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5 shrink-0" />
+                          {t("advisor.menuRename")}
+                        </button>
+                        <button
+                          onClick={() => deleteChat(chat)}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                          {t("advisor.menuDelete")}
+                        </button>
+                      </>
+                    );
+                  })()}
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
