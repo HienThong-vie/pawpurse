@@ -19,13 +19,13 @@ function GlassInput({
       </span>
       <div className="relative rounded-2xl border border-gray-200 dark:border-[#2a2a2a] bg-white/40 dark:bg-white/[0.03] backdrop-blur-sm transition-colors focus-within:border-emerald-500 dark:focus-within:border-[#e8643a] focus-within:bg-emerald-500/5 dark:focus-within:bg-[#e8643a]/5">
         {leftIcon && (
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#666] pointer-events-none">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#888] pointer-events-none">
             {leftIcon}
           </span>
         )}
         <input
           {...inputProps}
-          className={`w-full bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#666] py-4 focus:outline-none rounded-2xl ${
+          className={`w-full bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#888] py-4 focus:outline-none rounded-2xl ${
             leftIcon ? "pl-12" : "pl-4"
           } ${rightSlot ? "pr-12" : "pr-4"}`}
         />

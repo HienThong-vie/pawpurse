@@ -179,6 +179,20 @@ function Dashboard() {
               }),
             });
             createdAny = true;
+
+            // Award coins to the mascot — scales with how close to the limit
+            // the user got (full budget = 10 coins). Fire-and-forget so a
+            // mascot failure can't block notifications.
+            const limit = Number(prior.limit) || 0;
+            const coins = limit > 0 ? Math.floor((saved / limit) * 10) : 0;
+            if (coins > 0) {
+              apiFetch("http://localhost:8000/mascot/coins", {
+                method: "PATCH",
+                body: JSON.stringify({ coins }),
+              }).catch((err) => {
+                console.error("Failed to award mascot coins", err);
+              });
+            }
           } catch (err) {
             console.error("Failed to create budget_saved notification", err);
           }

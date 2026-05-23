@@ -121,7 +121,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (isNewSignup) {
           try {
             sessionStorage.removeItem("smartfinance.newSignup");
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
         }
         if (
           current &&

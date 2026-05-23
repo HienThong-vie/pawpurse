@@ -55,6 +55,7 @@ function RatingPopup() {
         {
           from_name: user?.user_metadata?.username ?? "User",
           from_email: user?.email ?? "unknown",
+          reply_to: user?.email ?? "",
           emoji,
           rating: `${emoji} ${ratingLabel}`,
           message: comment || "No message provided",
@@ -119,7 +120,9 @@ function RatingPopup() {
         {/* Comment input — slides in when rating is selected */}
         <div
           className={`w-full overflow-hidden transition-all duration-300 ease-out ${
-            rating !== null ? "max-h-16 opacity-100 mb-8" : "max-h-0 opacity-0 mb-0"
+            rating !== null
+              ? "max-h-16 opacity-100 mb-8"
+              : "max-h-0 opacity-0 mb-0"
           }`}
         >
           <input

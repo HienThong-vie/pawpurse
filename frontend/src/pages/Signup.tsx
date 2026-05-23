@@ -46,6 +46,8 @@ function Signup() {
       if (error) {
         toast.error(error.message);
       } else {
+        // Sign out so no session exists yet — wizard fires on first login, not signup
+        await supabase.auth.signOut();
         toast.success(t("auth.toastAccountCreated"));
         navigate("/login");
       }

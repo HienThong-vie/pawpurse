@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";
 import Layout from "./components/layout";
+import SetupWizard from "./components/SetupWizard";
 import "./App.css";
 import { useAuth } from "./context/AuthContext";
 
@@ -13,11 +14,13 @@ const Transactions = lazy(() => import("./pages/Transactions"));
 const Budget = lazy(() => import("./pages/Budget"));
 const Advisor = lazy(() => import("./pages/Advisor"));
 const Goals = lazy(() => import("./pages/Goals"));
+const Companion = lazy(() => import("./pages/Companion"));
 const Settings = lazy(() => import("./pages/Settings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 function App() {
   const { user, isRecovering, loading } = useAuth();
+  const hasCompletedSetup = user?.user_metadata?.has_completed_setup === true;
   const location = useLocation();
 
   if (loading) {
@@ -39,6 +42,7 @@ function App() {
       {isRecovering && location.pathname !== "/reset-password" ? (
         <Navigate to="/reset-password" replace />
       ) : null}
+      {user && !hasCompletedSetup && !isRecovering && location.pathname !== "/signup" && <SetupWizard />}
       <Routes>
         <Route
           path="/"
@@ -60,6 +64,7 @@ function App() {
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/budget" element={<Budget />} />
           <Route path="/goals" element={<Goals />} />
+          <Route path="/companion" element={<Companion />} />
           <Route path="/advisor" element={<Advisor />} />
           <Route path="/settings" element={<Settings />} />
         </Route>

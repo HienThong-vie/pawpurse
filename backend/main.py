@@ -5,7 +5,7 @@ from core.database import (
     Base,
     engine,
 )
-from routers import transactions,budgets,categories,goals,settings,export,currency,notifications,delete_account
+from routers import transactions,budgets,categories,goals,settings,export,currency,notifications,delete_account,mascot,advisor
 from core.auth import fetch_jwks
 from core.limiter import limiter
 from slowapi.errors import RateLimitExceeded
@@ -41,7 +41,9 @@ app.include_router(export.router)
 app.include_router(currency.router)
 app.include_router(notifications.router)
 app.include_router(delete_account.router)
+app.include_router(mascot.router)
+app.include_router(advisor.router)
 Base.metadata.create_all(bind=engine) #create all database tables on startup
 @app.get("/") #when frontend send GET request to backend then the function below will be executed automatically
 def get_message():
-    return {"message": "Smart Finance Tracker API is running"}
+    return {"message": "Paw Purse API is running"}

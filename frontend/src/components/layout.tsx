@@ -11,6 +11,7 @@ import {
   Menu,
   X,
   Bell,
+  PawPrint,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
@@ -18,12 +19,14 @@ import { useNotifications } from "../context/NotificationContext";
 import supabase from "../lib/supabaseClient";
 import NotificationPanel from "./NotificationPanel";
 import RatingPopup from "./RatingPopup";
+import SleepingMascot from "./SleepingMascot";
 
 const SIDEBAR_ROUTES: Record<string, string> = {
   "/dashboard": "sidebar.dashboard",
   "/transactions": "sidebar.transactions",
   "/budget": "sidebar.budget",
   "/goals": "sidebar.goals",
+  "/companion": "sidebar.companion",
 };
 
 function Layout() {
@@ -75,7 +78,7 @@ function Layout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static z-50 flex flex-col w-64 min-h-screen bg-white dark:bg-[var(--bg-surface)] border-r border-gray-300 dark:border-[var(--bd)] px-4 py-6 transform transition-transform lg:transform-none ${
+        className={`fixed z-50 flex flex-col w-64 h-screen bg-white dark:bg-[var(--bg-surface)] border-r border-gray-300 dark:border-[var(--bd)] px-4 py-6 transform transition-transform overflow-y-auto ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0`}
       >
@@ -89,7 +92,7 @@ function Layout() {
         </button>
 
         <h1 className="flex items-center gap-2 whitespace-nowrap text-gray-900 dark:text-white font-bold text-base tracking-tight px-2 mb-8">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 dark:bg-[#e8643a] shrink-0" />
+          <PawPrint className="inline-block w-auto h-auto text-emerald-500 dark:text-[#e8643a] shrink-0" />
           {t("common.appName")}
         </h1>
 
@@ -117,6 +120,12 @@ function Layout() {
               <NavLink to="/goals" className={navLinkClass}>
                 <Target className="w-4 h-4 shrink-0" />
                 {t("sidebar.goals")}
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/companion" className={navLinkClass}>
+                <PawPrint className="w-4 h-4 shrink-0" />
+                {t("sidebar.companion")}
               </NavLink>
             </li>
             <li>
@@ -171,7 +180,7 @@ function Layout() {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 min-w-0 bg-white dark:bg-[var(--bg-page)]">
+      <main className="flex-1 min-w-0 bg-white dark:bg-[var(--bg-page)] lg:pl-64">
         {showSidebar ? (
           /* Global top bar (Dashboard / Transactions / Budget / Goals) */
           <div className="sticky top-0 z-30 bg-white dark:bg-[var(--bg-surface)] border-b border-gray-200 dark:border-[var(--bd)] h-[52px] px-4 lg:px-8 flex items-center gap-3">
@@ -213,7 +222,7 @@ function Layout() {
             </button>
             <span className="flex items-center gap-2 text-gray-900 dark:text-white font-semibold text-sm">
               <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 dark:bg-[#e8643a]" />
-              Smart Finance Tracker
+              {t("common.appName")}
             </span>
           </div>
         )}
@@ -225,6 +234,7 @@ function Layout() {
 
       <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
       <RatingPopup />
+      <SleepingMascot />
     </div>
   );
 }

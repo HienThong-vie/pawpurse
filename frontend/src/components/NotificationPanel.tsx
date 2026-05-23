@@ -29,13 +29,8 @@ function NotificationPanel({ open, onClose }: Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
-  const {
-    notifications,
-    loading,
-    markRead,
-    markAllRead,
-    deleteOne,
-  } = useNotifications();
+  const { notifications, loading, markRead, markAllRead, deleteOne } =
+    useNotifications();
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Close on Escape
@@ -52,10 +47,7 @@ function NotificationPanel({ open, onClose }: Props) {
   useEffect(() => {
     if (!open) return;
     function onClick(e: MouseEvent) {
-      if (
-        panelRef.current &&
-        !panelRef.current.contains(e.target as Node)
-      ) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         onClose();
       }
     }

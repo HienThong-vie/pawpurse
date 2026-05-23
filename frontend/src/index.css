@@ -17,6 +17,12 @@
   --bd: #333333;
 }
 
+/* Ensure placeholder text is readable against dark surfaces */
+.dark ::placeholder {
+  color: #8a8a8a;
+  opacity: 1;
+}
+
 /* Subtle scrollbar that blends with card surfaces */
 .thin-scrollbar {
   scrollbar-width: thin;
@@ -58,6 +64,15 @@
   border: 2px solid transparent;
 }
 
+/* Setup wizard step transition */
+@keyframes wizardFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.wizard-step {
+  animation: wizardFadeIn 180ms ease-out forwards;
+}
+
 /* Auth page entrance animations — hand-rolled, no plugin */
 @keyframes fadeSlideIn {
   from { opacity: 0; filter: blur(4px); transform: translateY(12px); }
@@ -86,3 +101,12 @@
 .animate-delay-700 { animation-delay: 700ms; }
 .animate-delay-800 { animation-delay: 800ms; }
 .animate-delay-900 { animation-delay: 900ms; }
+
+/* Sleeping mascot — slow up/down float suggesting sleep breathing */
+@keyframes mascotFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+.mascot-float {
+  animation: mascotFloat 3s ease-in-out infinite;
+}
