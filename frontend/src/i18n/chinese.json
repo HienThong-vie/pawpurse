@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "智能财务管家",
+    "appName": "PawPurse",
     "userFallback": "用户",
     "save": "保存",
     "saving": "保存中...",

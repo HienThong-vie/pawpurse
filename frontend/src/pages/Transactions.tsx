@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { Dispatch, SetStateAction, ReactNode } from "react";
 import {
   Plus,
@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Check,
   X,
+  MoreVertical,
 } from "lucide-react";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { useAuth } from "../context/AuthContext";
@@ -18,7 +19,7 @@ import { useConfirm } from "../context/ConfirmContext";
 import { useTheme } from "../context/ThemeContext";
 import { useTranslation } from "react-i18next";
 import { formatCurrency, formatDate, fetchBaseCurrency } from "../lib/utils";
-import { apiFetch } from "../lib/api";
+import { apiFetch, API_BASE } from "../lib/api";
 import ErrorBanner from "../components/ErrorBanner";
 
 type FieldErrors = {
@@ -681,8 +682,22 @@ function Transactions() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [editId, setEditId] = useState<number | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [menuPos, setMenuPos] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [sortBy, setSortBy] = useState<SortKey>("newest");
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
+
+  const emojiByCategory = useMemo(() => {
+    const map: Record<string, string> = {};
+    categories.forEach((c: any) => {
+      if (c?.name && c?.emoji) map[c.name.toLowerCase()] = c.emoji;
+    });
+    return map;
+  }, [categories]);
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">(
@@ -773,7 +788,7 @@ function Transactions() {
     async (sortDir: "newest" | "oldest" = "newest") => {
       try {
         const response = await apiFetch(
-          `http://localhost:8000/transactions/?base_currency=${baseCurrency}&sort=${sortDir}`,
+          `${API_BASE}/transactions/?base_currency=${baseCurrency}&sort=${sortDir}`,
           { method: "GET" },
         );
         const data = await response.json();
@@ -787,7 +802,7 @@ function Transactions() {
 
   const fetchCategories = useCallback(async () => {
     try {
-      const response = await apiFetch(`http://localhost:8000/categories/`, {
+      const response = await apiFetch(`${API_BASE}/categories/`, {
         method: "GET",
       });
       const data = await response.json();
@@ -803,7 +818,7 @@ function Transactions() {
         const currency = await fetchBaseCurrency();
         setBaseCurrency(currency);
         const transResponse = await apiFetch(
-          `http://localhost:8000/transactions/?base_currency=${currency}&sort=newest`,
+          `${API_BASE}/transactions/?base_currency=${currency}&sort=newest`,
         );
         const transData = await transResponse.json();
         setTransactions(transData);
@@ -828,6 +843,47 @@ function Transactions() {
       setTransactions((prev) => applySort([...prev], sortBy));
     }
   }, [sortBy, fetchTransactions]);
+
+  // Per-card kebab menu (mobile/tablet) uses fixed positioning so it escapes
+  // the card list's overflow-y-auto clipping. Anchor coords come from the
+  // button's getBoundingClientRect at open time. Menu width is 128px (w-32).
+  function openTxMenu(e: React.MouseEvent, txId: number) {
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenuPos({ top: rect.bottom + 4, left: rect.right - 128 });
+    setOpenMenuId(txId);
+  }
+
+  function closeTxMenu() {
+    setOpenMenuId(null);
+    setMenuPos(null);
+  }
+
+  useEffect(() => {
+    if (openMenuId === null) return;
+    function onPointerDown(e: MouseEvent | TouchEvent) {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      // Clicks on any kebab button are handled by its onClick (toggle/switch);
+      // don't close here or we'd cancel the toggle.
+      if (target.closest("[data-tx-kebab]")) return;
+      if (menuRef.current && !menuRef.current.contains(target)) {
+        closeTxMenu();
+      }
+    }
+    function onScroll() {
+      closeTxMenu();
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    // capture: true so scroll on inner overflow containers also dismisses.
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [openMenuId]);
 
   function resetForm() {
     setEditId(null);
@@ -866,7 +922,7 @@ function Transactions() {
     setSubmitting(true);
     try {
       if (editId == null) {
-        await apiFetch(`http://localhost:8000/transactions/`, {
+        await apiFetch(`${API_BASE}/transactions/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -883,7 +939,7 @@ function Transactions() {
         });
         toast.success(t("transactions.toastAdded"));
       } else {
-        await apiFetch(`http://localhost:8000/transactions/${editId}`, {
+        await apiFetch(`${API_BASE}/transactions/${editId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -918,7 +974,7 @@ function Transactions() {
     });
     if (!proceed) return;
     try {
-      await apiFetch(`http://localhost:8000/transactions/${id}`, {
+      await apiFetch(`${API_BASE}/transactions/${id}`, {
         method: "DELETE",
       });
       fetchTransactions();
@@ -945,7 +1001,7 @@ function Transactions() {
 
   async function addCategory(name: string, emoji: string = "💼") {
     try {
-      await apiFetch(`http://localhost:8000/categories/`, {
+      await apiFetch(`${API_BASE}/categories/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: user?.id, name, emoji }),
@@ -961,7 +1017,7 @@ function Transactions() {
 
   async function handleUpdateCategoryEmoji(id: number, emoji: string) {
     try {
-      await apiFetch(`http://localhost:8000/categories/${id}`, {
+      await apiFetch(`${API_BASE}/categories/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emoji }),
@@ -1005,7 +1061,7 @@ function Transactions() {
       const relatedTx = transactions.filter((t) => t.category === cat.name);
 
       const budgetsRes = await apiFetch(
-        `http://localhost:8000/budgets/?base_currency=${baseCurrency}`,
+        `${API_BASE}/budgets/?base_currency=${baseCurrency}`,
       );
       const budgetsData = await budgetsRes.json();
       const relatedBudgets = budgetsData.filter(
@@ -1028,19 +1084,19 @@ function Transactions() {
 
         await Promise.all([
           ...relatedTx.map((t) =>
-            apiFetch(`http://localhost:8000/transactions/${t.id}`, {
+            apiFetch(`${API_BASE}/transactions/${t.id}`, {
               method: "DELETE",
             }),
           ),
           ...relatedBudgets.map((b: any) =>
-            apiFetch(`http://localhost:8000/budgets/${b.id}`, {
+            apiFetch(`${API_BASE}/budgets/${b.id}`, {
               method: "DELETE",
             }),
           ),
         ]);
       }
 
-      await apiFetch(`http://localhost:8000/categories/${category_id}`, {
+      await apiFetch(`${API_BASE}/categories/${category_id}`, {
         method: "DELETE",
       });
       toast.success(`Category "${cat.name}" deleted`);
@@ -1665,119 +1721,247 @@ function Transactions() {
         </div>
 
         {displayedTransactions.length > 0 ? (
-          <div
-            className="overflow-auto thin-scrollbar"
-            style={{ maxHeight: "calc(100vh - 360px)", minHeight: "200px" }}
-          >
-            <table className="w-full text-sm min-w-[600px]">
-              <thead className="sticky top-0 z-10">
-                <tr className="bg-gray-50 dark:bg-[var(--bg-muted)] border-b border-gray-200 dark:border-[var(--bd)]">
-                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
-                    {t("transactions.tableDate")}
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
-                    {t("transactions.tableType")}
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
-                    {t("transactions.tableCategory")}
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
-                    {t("transactions.tableNote")}
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
-                    {t("transactions.tableAmount")}
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
-                    {t("transactions.tableActions")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedTransactions.map((tx) => (
-                  <tr
+          <>
+            {/* ── Desktop: table view ── */}
+            <div
+              className="hidden lg:block overflow-auto thin-scrollbar"
+              style={{ maxHeight: "calc(100vh - 360px)", minHeight: "200px" }}
+            >
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-gray-50 dark:bg-[var(--bg-muted)] border-b border-gray-200 dark:border-[var(--bd)]">
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
+                      {t("transactions.tableDate")}
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
+                      {t("transactions.tableType")}
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
+                      {t("transactions.tableCategory")}
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
+                      {t("transactions.tableNote")}
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
+                      {t("transactions.tableAmount")}
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
+                      {t("transactions.tableActions")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedTransactions.map((tx) => (
+                    <tr
+                      key={tx.id}
+                      className={`border-b border-gray-100 dark:border-[var(--bd)] last:border-b-0 hover:bg-gray-50/80 dark:hover:bg-[var(--bg-hover)] transition-colors ${
+                        editId === tx.id
+                          ? "bg-emerald-50/40 dark:bg-[#e8643a]/5"
+                          : ""
+                      }`}
+                    >
+                      <td className="px-4 py-3 text-gray-500 dark:text-[#e0e0e0] whitespace-nowrap text-xs">
+                        {formatDate(tx.date)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold ${
+                            tx.type === "income"
+                              ? "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                              : "bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-400"
+                          }`}
+                        >
+                          {tx.type === "income"
+                            ? t("transactions.income")
+                            : t("transactions.expense")}
+                          {tx.is_recurring && (
+                            <RefreshCw className="w-2.5 h-2.5 opacity-70" />
+                          )}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-700 dark:text-[#e0e0e0] text-sm">
+                        {tx.category}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-gray-500 dark:text-[#a0a0a0] text-sm ${
+                          tx.note && tx.note.length > 30
+                            ? "cursor-pointer hover:text-gray-700 dark:hover:text-white"
+                            : ""
+                        }`}
+                        onClick={() => {
+                          if (tx.note && tx.note.length > 30) {
+                            setExpanded((prev) => ({
+                              ...prev,
+                              [tx.id]: !prev[tx.id],
+                            }));
+                          }
+                        }}
+                      >
+                        {tx.note && tx.note.length > 30 && !expanded[tx.id]
+                          ? `${tx.note.slice(0, 30)}…`
+                          : tx.note || (
+                              <span className="text-gray-300 dark:text-[#444]">
+                                —
+                              </span>
+                            )}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-right font-semibold tabular-nums ${
+                          tx.type === "income"
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-red-600 dark:text-red-400"
+                        }`}
+                      >
+                        {tx.type === "expense" ? "-" : "+"}
+                        {formatCurrency(tx.amount, baseCurrency)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1.5">
+                          <button
+                            onClick={() => handleEdit(tx)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-gray-300 dark:border-[var(--bd)] text-xs font-medium text-gray-600 dark:text-[#e0e0e0] bg-white dark:bg-[var(--bg-surface)] hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] transition-colors"
+                          >
+                            <Pencil className="w-3 h-3" /> {t("common.edit")}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(tx.id)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-red-200 dark:border-red-500/30 text-xs font-medium text-red-600 dark:text-red-400 bg-white dark:bg-[var(--bg-surface)] hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" /> {t("common.delete")}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ── Mobile / tablet: card view ── */}
+            <div
+              className="lg:hidden flex flex-col gap-2 overflow-y-auto thin-scrollbar"
+              style={{ maxHeight: "calc(100vh - 360px)", minHeight: "200px" }}
+            >
+              {displayedTransactions.map((tx) => {
+                const emoji =
+                  emojiByCategory[String(tx.category).toLowerCase()] ||
+                  (tx.type === "income" ? "💰" : "💳");
+                return (
+                  <div
                     key={tx.id}
-                    className={`border-b border-gray-100 dark:border-[var(--bd)] last:border-b-0 hover:bg-gray-50/80 dark:hover:bg-[var(--bg-hover)] transition-colors ${
+                    className={`rounded-2xl bg-gray-50 dark:bg-[var(--bg-muted)] px-3.5 py-3 ${
                       editId === tx.id
-                        ? "bg-emerald-50/40 dark:bg-[#e8643a]/5"
+                        ? "ring-2 ring-emerald-500/40 dark:ring-[#e8643a]/40"
                         : ""
                     }`}
                   >
-                    <td className="px-4 py-3 text-gray-500 dark:text-[#e0e0e0] whitespace-nowrap text-xs">
-                      {formatDate(tx.date)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold ${
+                    <div className="flex items-center gap-3">
+                      {/* Category emoji icon */}
+                      <div
+                        className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center text-xl ${
                           tx.type === "income"
-                            ? "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-                            : "bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-400"
+                            ? "bg-emerald-100 dark:bg-emerald-500/15"
+                            : "bg-white dark:bg-[var(--bg-surface)]"
                         }`}
                       >
-                        {tx.type === "income"
-                          ? t("transactions.income")
-                          : t("transactions.expense")}
-                        {tx.is_recurring && (
-                          <RefreshCw className="w-2.5 h-2.5 opacity-70" />
-                        )}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-700 dark:text-[#e0e0e0] text-sm">
-                      {tx.category}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-gray-500 dark:text-[#a0a0a0] text-sm ${
-                        tx.note && tx.note.length > 30
-                          ? "cursor-pointer hover:text-gray-700 dark:hover:text-white"
-                          : ""
-                      }`}
-                      onClick={() => {
-                        if (tx.note && tx.note.length > 30) {
-                          setExpanded((prev) => ({
-                            ...prev,
-                            [tx.id]: !prev[tx.id],
-                          }));
-                        }
-                      }}
-                    >
-                      {tx.note && tx.note.length > 30 && !expanded[tx.id]
-                        ? `${tx.note.slice(0, 30)}…`
-                        : tx.note || (
-                            <span className="text-gray-300 dark:text-[#444]">
-                              —
-                            </span>
+                        <span aria-hidden="true">{emoji}</span>
+                      </div>
+
+                      {/* Title + date */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                          {tx.category}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-[#a0a0a0] flex items-center gap-1 mt-0.5">
+                          <span className="truncate">{formatDate(tx.date)}</span>
+                          {tx.is_recurring && (
+                            <RefreshCw className="w-3 h-3 opacity-70 shrink-0" />
                           )}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right font-semibold tabular-nums ${
-                        tx.type === "income"
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : "text-red-600 dark:text-red-400"
-                      }`}
-                    >
-                      {tx.type === "expense" ? "-" : "+"}
-                      {formatCurrency(tx.amount, baseCurrency)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1.5">
-                        <button
-                          onClick={() => handleEdit(tx)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-gray-300 dark:border-[var(--bd)] text-xs font-medium text-gray-600 dark:text-[#e0e0e0] bg-white dark:bg-[var(--bg-surface)] hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] transition-colors"
+                        </p>
+                      </div>
+
+                      {/* Amount + kebab */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span
+                          className={`text-sm font-bold tabular-nums whitespace-nowrap ${
+                            tx.type === "income"
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-red-600 dark:text-red-400"
+                          }`}
                         >
-                          <Pencil className="w-3 h-3" /> {t("common.edit")}
-                        </button>
+                          {tx.type === "expense" ? "-" : "+"}
+                          {formatCurrency(tx.amount, baseCurrency)}
+                        </span>
                         <button
-                          onClick={() => handleDelete(tx.id)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-red-200 dark:border-red-500/30 text-xs font-medium text-red-600 dark:text-red-400 bg-white dark:bg-[var(--bg-surface)] hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                          type="button"
+                          data-tx-kebab
+                          onClick={(e) =>
+                            openMenuId === tx.id
+                              ? closeTxMenu()
+                              : openTxMenu(e, tx.id)
+                          }
+                          className="p-1 rounded-md text-gray-400 dark:text-[#666] hover:text-gray-600 dark:hover:text-white hover:bg-gray-200/60 dark:hover:bg-[var(--bg-hover)] transition-colors"
+                          aria-label="Transaction options"
                         >
-                          <Trash2 className="w-3 h-3" /> {t("common.delete")}
+                          <MoreVertical className="w-4 h-4" />
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+
+                    {/* Note (full, wraps below) */}
+                    {tx.note && (
+                      <p className="mt-2 ml-14 text-xs text-gray-500 dark:text-[#a0a0a0] break-words leading-relaxed">
+                        {tx.note}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Fixed-position kebab menu (mobile/tablet) — rendered outside
+                the scroll container so it can't be clipped. */}
+            {openMenuId !== null && menuPos && (
+              <div
+                ref={menuRef}
+                className="lg:hidden fixed z-50 w-32 bg-white dark:bg-[var(--bg-surface)] border border-gray-200 dark:border-[var(--bd)] rounded-xl shadow-lg overflow-hidden py-1"
+                style={{ top: menuPos.top, left: menuPos.left }}
+              >
+                {(() => {
+                  const tx = displayedTransactions.find(
+                    (t: any) => t.id === openMenuId,
+                  );
+                  if (!tx) return null;
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleEdit(tx);
+                          closeTxMenu();
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-[#e0e0e0] hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] transition-colors text-left"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        {t("common.edit")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleDelete(tx.id);
+                          closeTxMenu();
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors text-left"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        {t("common.delete")}
+                      </button>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+          </>
         ) : (
           <div className="py-14 text-center">
             <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-[var(--bg-muted)] flex items-center justify-center mx-auto mb-3">

@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Pawpurse",
+    "appName": "PawPurse",
     "userFallback": "Người dùng",
     "save": "Lưu",
     "saving": "Đang lưu...",
@@ -364,7 +364,7 @@
   },
   "ratingPopup": {
     "title": "Bạn thấy trải nghiệm thế nào?",
-    "subtitle": "Phản hồi của bạn giúp chúng tôi cải thiện Smart Finance Tracker.",
+    "subtitle": "Phản hồi của bạn giúp chúng tôi cải thiện PawPurse.",
     "commentPlaceholder": "Bình luận (tuỳ chọn)",
     "submit": "Gửi",
     "maybeLater": "Để sau",

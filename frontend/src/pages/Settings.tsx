@@ -21,7 +21,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useToast } from "../context/ToastContext";
 import { useConfirm } from "../context/ConfirmContext";
-import { apiFetch } from "../lib/api";
+import { apiFetch, API_BASE } from "../lib/api";
 import { useTranslation } from "react-i18next";
 
 const RATING_LABEL_KEYS = [
@@ -184,7 +184,7 @@ function ProfileSection() {
     if (!ok) return;
     setDeleting(true);
     try {
-      await apiFetch("http://localhost:8000/account/", { method: "DELETE" });
+      await apiFetch(`${API_BASE}/account/`, { method: "DELETE" });
       await supabase.auth.signOut();
       navigate("/login");
     } catch (err: any) {
@@ -364,7 +364,7 @@ function PreferencesSection() {
 
   useEffect(() => {
     let cancelled = false;
-    apiFetch("http://localhost:8000/settings/")
+    apiFetch(`${API_BASE}/settings/`)
       .then((r) => r.json())
       .then((data) => {
         if (!cancelled) setCurrency(data.base_currency ?? "USD");
@@ -376,7 +376,7 @@ function PreferencesSection() {
   async function handleSaveCurrency() {
     setSaving(true);
     try {
-      await apiFetch("http://localhost:8000/settings/", {
+      await apiFetch(`${API_BASE}/settings/`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: user?.id, base_currency: currency }),
@@ -776,7 +776,7 @@ function DataPrivacySection() {
       msgKey: "settings.confirmClearNotifications",
       action: async () => {
         try {
-          await apiFetch("http://localhost:8000/notifications/clear-all", {
+          await apiFetch(`${API_BASE}/notifications/clear-all`, {
             method: "DELETE",
           });
           toast.success(t("settings.toastNotificationsCleared"));
@@ -791,7 +791,7 @@ function DataPrivacySection() {
       msgKey: "settings.confirmClearTransactions",
       action: async () => {
         try {
-          await apiFetch("http://localhost:8000/transactions/all", {
+          await apiFetch(`${API_BASE}/transactions/all`, {
             method: "DELETE",
           });
           toast.success(t("settings.dataPrivacy.transactionsCleared"));
@@ -806,7 +806,7 @@ function DataPrivacySection() {
       msgKey: "settings.confirmClearBudgets",
       action: async () => {
         try {
-          await apiFetch("http://localhost:8000/budgets/all", {
+          await apiFetch(`${API_BASE}/budgets/all`, {
             method: "DELETE",
           });
           toast.success(t("settings.dataPrivacy.budgetsCleared"));
@@ -832,7 +832,7 @@ function DataPrivacySection() {
         <div className="flex flex-col sm:flex-row gap-2">
           <button
             onClick={async () => {
-              const res = await apiFetch("http://localhost:8000/export/csv", { method: "GET" });
+              const res = await apiFetch(`${API_BASE}/export/csv`, { method: "GET" });
               const blob = await res.blob();
               const url = window.URL.createObjectURL(blob);
               const a = document.createElement("a");
@@ -848,7 +848,7 @@ function DataPrivacySection() {
           </button>
           <button
             onClick={async () => {
-              const res = await apiFetch("http://localhost:8000/export/pdf", { method: "GET" });
+              const res = await apiFetch(`${API_BASE}/export/pdf`, { method: "GET" });
               const blob = await res.blob();
               const url = window.URL.createObjectURL(blob);
               const a = document.createElement("a");

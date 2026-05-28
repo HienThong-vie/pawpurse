@@ -11,13 +11,14 @@ from core.limiter import limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 
-frontend_url = os.getenv(" FRONTEND_URL")
+frontend_url = os.getenv("FRONTEND_URL")
 app = FastAPI()
 origins = [
     "http://localhost:5173",
     "http://localhost:5174",
-    frontend_url
 ]
+if frontend_url:
+    origins.append(frontend_url)
 
 app.add_middleware(
     CORSMiddleware,
@@ -46,4 +47,4 @@ app.include_router(advisor.router)
 Base.metadata.create_all(bind=engine) #create all database tables on startup
 @app.get("/") #when frontend send GET request to backend then the function below will be executed automatically
 def get_message():
-    return {"message": "Paw Purse API is running"}
+    return {"message": "PawPurse API is running"}

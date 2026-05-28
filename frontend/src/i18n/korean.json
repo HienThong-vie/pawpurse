@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "스마트 자산 관리",
+    "appName": "PawPurse",
     "userFallback": "사용자",
     "save": "저장",
     "saving": "저장 중...",

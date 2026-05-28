@@ -19,7 +19,7 @@ import { useNotifications } from "../context/NotificationContext";
 import supabase from "../lib/supabaseClient";
 import NotificationPanel from "./NotificationPanel";
 import RatingPopup from "./RatingPopup";
-import SleepingMascot from "./SleepingMascot";
+import SleepingMascot, { MASCOT_HIDDEN_ROUTES } from "./SleepingMascot";
 
 const SIDEBAR_ROUTES: Record<string, string> = {
   "/dashboard": "sidebar.dashboard",
@@ -28,6 +28,13 @@ const SIDEBAR_ROUTES: Record<string, string> = {
   "/goals": "sidebar.goals",
   "/companion": "sidebar.companion",
 };
+
+// Routes that render their own mobile/tablet top bar (including the burger
+// trigger) — Layout must NOT render the fallback mobile header for these, or
+// the page will have a duplicated header row on small screens.
+export const ROUTES_WITH_OWN_MOBILE_HEADER = ["/advisor"];
+
+export type LayoutOutletContext = { openSidebar: () => void };
 
 function Layout() {
   const { user, username } = useAuth();
@@ -40,6 +47,10 @@ function Layout() {
 
   const sidebarKey = SIDEBAR_ROUTES[location.pathname];
   const showSidebar = Boolean(sidebarKey);
+  const mascotVisible = !MASCOT_HIDDEN_ROUTES.includes(location.pathname);
+  const hasOwnMobileHeader = ROUTES_WITH_OWN_MOBILE_HEADER.includes(
+    location.pathname,
+  );
 
   const rawAvatarUrl = user?.user_metadata?.avatar_url as string | undefined;
   const avatarUrl = useMemo(
@@ -210,7 +221,7 @@ function Layout() {
               </button>
             </div>
           </div>
-        ) : (
+        ) : !hasOwnMobileHeader ? (
           /* Mobile-only fallback for pages without the global top bar */
           <div className="lg:hidden sticky top-0 z-30 bg-white dark:bg-[var(--bg-page)] border-b border-gray-300 dark:border-[var(--bd)] px-4 py-3 flex items-center gap-3">
             <button
@@ -225,10 +236,12 @@ function Layout() {
               {t("common.appName")}
             </span>
           </div>
-        )}
+        ) : null}
 
-        <div className="p-4 lg:p-8">
-          <Outlet />
+        <div
+          className={`p-4 lg:p-8 ${mascotVisible ? "pb-28 lg:pb-8" : ""}`}
+        >
+          <Outlet context={{ openSidebar: () => setSidebarOpen(true) }} />
         </div>
       </main>
 

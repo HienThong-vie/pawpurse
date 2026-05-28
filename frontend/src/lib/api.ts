@@ -1,4 +1,9 @@
 import supabase from "./supabaseClient";
+
+export const API_BASE: string =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ||
+  "http://localhost:8000";
+
 export async function apiFetch(
   url: string,
   options?: RequestInit,

@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatCurrency, fetchBaseCurrency, formatDate } from "../lib/utils";
-import { apiFetch } from "../lib/api";
+import { apiFetch, API_BASE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationContext";
 import { useTranslation } from "react-i18next";
@@ -85,11 +85,11 @@ function Dashboard() {
         setBaseCurrency(currency);
         const [transRes, goalsRes, catsRes, budgetsRes] = await Promise.all([
           apiFetch(
-            `http://localhost:8000/transactions/?base_currency=${currency}`,
+            `${API_BASE}/transactions/?base_currency=${currency}`,
           ),
-          apiFetch(`http://localhost:8000/goals/?base_currency=${currency}`),
-          apiFetch(`http://localhost:8000/categories/`),
-          apiFetch(`http://localhost:8000/budgets/?base_currency=${currency}`),
+          apiFetch(`${API_BASE}/goals/?base_currency=${currency}`),
+          apiFetch(`${API_BASE}/categories/`),
+          apiFetch(`${API_BASE}/budgets/?base_currency=${currency}`),
         ]);
         setTransactions(await transRes.json());
         setGoals(await goalsRes.json());
@@ -124,7 +124,7 @@ function Dashboard() {
       // Fetch existing notifications once for both dedup checks.
       let existingNotifs: any[] = [];
       try {
-        const r = await apiFetch(`http://localhost:8000/notifications/`);
+        const r = await apiFetch(`${API_BASE}/notifications/`);
         existingNotifs = await r.json();
       } catch {
         // permissive — worst case we send a duplicate once
@@ -163,7 +163,7 @@ function Dashboard() {
           if (duplicate) continue;
 
           try {
-            await apiFetch(`http://localhost:8000/notifications/`, {
+            await apiFetch(`${API_BASE}/notifications/`, {
               method: "POST",
               body: JSON.stringify({
                 type: "budget_saved",
@@ -186,7 +186,7 @@ function Dashboard() {
             const limit = Number(prior.limit) || 0;
             const coins = limit > 0 ? Math.floor((saved / limit) * 10) : 0;
             if (coins > 0) {
-              apiFetch("http://localhost:8000/mascot/coins", {
+              apiFetch(`${API_BASE}/mascot/coins`, {
                 method: "PATCH",
                 body: JSON.stringify({ coins }),
               }).catch((err) => {
@@ -220,7 +220,7 @@ function Dashboard() {
 
           const remaining = Number(b.limit) - Number(b.spent ?? 0);
           try {
-            await apiFetch(`http://localhost:8000/notifications/`, {
+            await apiFetch(`${API_BASE}/notifications/`, {
               method: "POST",
               body: JSON.stringify({
                 type: "budget_warning",

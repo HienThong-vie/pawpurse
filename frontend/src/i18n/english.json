@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Pawpurse",
+    "appName": "PawPurse",
     "userFallback": "User",
     "save": "Save",
     "saving": "Saving...",
@@ -365,7 +365,7 @@
   },
   "ratingPopup": {
     "title": "How was your experience?",
-    "subtitle": "Your feedback helps us make Pawpurse better.",
+    "subtitle": "Your feedback helps us make PawPurse better.",
     "commentPlaceholder": "Any comments? (optional)",
     "submit": "Submit",
     "maybeLater": "Maybe later",

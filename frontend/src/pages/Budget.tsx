@@ -16,7 +16,7 @@ import { useToast } from "../context/ToastContext";
 import { useConfirm } from "../context/ConfirmContext";
 import { useTheme } from "../context/ThemeContext";
 import { formatCurrency, fetchBaseCurrency } from "../lib/utils";
-import { apiFetch } from "../lib/api";
+import { apiFetch, API_BASE } from "../lib/api";
 import ErrorBanner from "../components/ErrorBanner";
 
 type BudgetFieldErrors = {
@@ -389,7 +389,7 @@ function Budget() {
 
   const fetchCategories = useCallback(async () => {
     try {
-      const response = await apiFetch(`http://localhost:8000/categories/`, {
+      const response = await apiFetch(`${API_BASE}/categories/`, {
         method: "GET",
       });
       const data = await response.json();
@@ -402,7 +402,7 @@ function Budget() {
   const fetchBudgets = useCallback(async () => {
     try {
       const response = await apiFetch(
-        `http://localhost:8000/budgets/?base_currency=${baseCurrency}`,
+        `${API_BASE}/budgets/?base_currency=${baseCurrency}`,
         { method: "GET" },
       );
       const data = await response.json();
@@ -418,7 +418,7 @@ function Budget() {
         const currency = await fetchBaseCurrency();
         setBaseCurrency(currency);
         const budgetResponse = await apiFetch(
-          `http://localhost:8000/budgets/?base_currency=${currency}`,
+          `${API_BASE}/budgets/?base_currency=${currency}`,
         );
         const budgetRes = await budgetResponse.json();
         fetchCategories();
@@ -496,7 +496,7 @@ function Budget() {
     setSubmitting(true);
     try {
       if (editId == null) {
-        await apiFetch(`http://localhost:8000/budgets/`, {
+        await apiFetch(`${API_BASE}/budgets/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -515,7 +515,7 @@ function Budget() {
             : t("budget.toastAdded"),
         );
       } else {
-        await apiFetch(`http://localhost:8000/budgets/${editId}`, {
+        await apiFetch(`${API_BASE}/budgets/${editId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -538,7 +538,7 @@ function Budget() {
 
   async function handleDelete(budget_id: number) {
     try {
-      await apiFetch(`http://localhost:8000/budgets/${budget_id}`, {
+      await apiFetch(`${API_BASE}/budgets/${budget_id}`, {
         method: "DELETE",
       });
       fetchBudgets();
@@ -580,7 +580,7 @@ function Budget() {
     if (!newCategoryName.trim()) return;
     setSubmittingCategory(true);
     try {
-      await apiFetch(`http://localhost:8000/categories/`, {
+      await apiFetch(`${API_BASE}/categories/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -605,7 +605,7 @@ function Budget() {
 
   async function handleUpdateCategoryEmoji(id: number, emoji: string) {
     try {
-      await apiFetch(`http://localhost:8000/categories/${id}`, {
+      await apiFetch(`${API_BASE}/categories/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emoji }),
@@ -633,7 +633,7 @@ function Budget() {
 
     try {
       const txRes = await apiFetch(
-        `http://localhost:8000/transactions/?base_currency=${baseCurrency}`,
+        `${API_BASE}/transactions/?base_currency=${baseCurrency}`,
       );
       const txData = await txRes.json();
       const relatedTx = txData.filter((t: any) => t.category === cat.name);
@@ -657,19 +657,19 @@ function Budget() {
 
         await Promise.all([
           ...relatedTx.map((t: any) =>
-            apiFetch(`http://localhost:8000/transactions/${t.id}`, {
+            apiFetch(`${API_BASE}/transactions/${t.id}`, {
               method: "DELETE",
             }),
           ),
           ...relatedBudgets.map((b: any) =>
-            apiFetch(`http://localhost:8000/budgets/${b.id}`, {
+            apiFetch(`${API_BASE}/budgets/${b.id}`, {
               method: "DELETE",
             }),
           ),
         ]);
       }
 
-      await apiFetch(`http://localhost:8000/categories/${category_id}`, {
+      await apiFetch(`${API_BASE}/categories/${category_id}`, {
         method: "DELETE",
       });
       toast.success(`Category "${cat.name}" deleted`);
@@ -708,7 +708,7 @@ function Budget() {
   }
 
   return (
-    <div className="font-[Inter] overflow-x-hidden">
+    <div className="font-[Inter] overflow-x-clip">
       {/* Page subtitle */}
       <header className="mb-6 lg:mb-8">
         <p className="text-sm text-gray-500 dark:text-[#a0a0a0]">
@@ -1077,12 +1077,8 @@ function Budget() {
         {t("budget.sectionYourBudgets")}
       </p>
 
-      {/* ── BUDGET CARDS (scrollable) ── */}
-      <div
-        className="overflow-auto thin-scrollbar"
-        style={{ maxHeight: "calc(100vh - 360px)", minHeight: "200px" }}
-      >
-        {budgets.length > 0 ? (
+      {/* ── BUDGET CARDS ── */}
+      {budgets.length > 0 ? (
           <div className="grid grid-cols-1 min-[1400px]:grid-cols-2 gap-4 pb-1">
             {budgets.map((budget) => {
               const pct = Math.min(budget.percentage ?? 0, 100);
@@ -1269,7 +1265,6 @@ function Budget() {
             </p>
           </div>
         )}
-      </div>
 
       {/* Mobile-only budget detail modal */}
       <BudgetDetailModal

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { apiFetch } from "../lib/api";
+import { apiFetch, API_BASE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { getBed, MASCOT_UPDATED_EVENT } from "../lib/shopBeds";
 
@@ -10,6 +10,10 @@ type Mascot = {
   companion_name: string;
   active_bed: string;
 };
+
+// Routes where the floating widget is hidden. Layout reads this to skip the
+// extra bottom padding it adds elsewhere so content can scroll clear of the mascot.
+export const MASCOT_HIDDEN_ROUTES = ["/advisor", "/companion"];
 
 function SleepingMascot() {
   const { user } = useAuth();
@@ -29,7 +33,7 @@ function SleepingMascot() {
 
     async function load() {
       try {
-        const r = await apiFetch("http://localhost:8000/mascot/");
+        const r = await apiFetch(`${API_BASE}/mascot/`);
         const data = await r.json();
         if (!cancelled) setMascot(data);
       } catch {
@@ -48,12 +52,11 @@ function SleepingMascot() {
     };
   }, [hasCompletedSetup, user?.id]);
 
-  const hiddenRoutes = ["/advisor", "/companion"];
   if (
     !hasCompletedSetup ||
     !mascot ||
     !companionType ||
-    hiddenRoutes.includes(location.pathname)
+    MASCOT_HIDDEN_ROUTES.includes(location.pathname)
   )
     return null;
 

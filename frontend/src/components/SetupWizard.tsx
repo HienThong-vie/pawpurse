@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import supabase from "../lib/supabaseClient";
 import { useTranslation } from "react-i18next";
-import { apiFetch } from "../lib/api";
+import { apiFetch, API_BASE } from "../lib/api";
 import { useToast } from "../context/ToastContext";
 import i18n from "../i18n/config";
 import { Check, Loader2, PawPrint } from "lucide-react";
@@ -106,7 +106,7 @@ function SetupWizard() {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session) throw new Error("Session lost after setup");
-      await apiFetch("http://localhost:8000/settings/", {
+      await apiFetch(`${API_BASE}/settings/`, {
         method: "PUT",
         body: JSON.stringify({ base_currency: currency }),
       });

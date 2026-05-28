@@ -19,8 +19,8 @@ SHOP_BEDS = [
     {"id": "blue_cushion", "name": "Blue Cushion", "cost": 10, "emoji": "🔵", "color": "#3B82F6"},
     {"id": "pink_pillow", "name": "Pink Pillow", "cost": 15, "emoji": "🩷", "color": "#EC4899"},
     {"id": "royal_bed", "name": "Royal Bed", "cost": 25, "emoji": "👑", "color": "#8B5CF6"},
-    {"id": "space_pod", "name": "Space Pod", "cost": 30, "emoji": "🚀", "color": "#1E1B4B"},
-    {"id": "nature_nest", "name": "Nature Nest", "cost": 20, "emoji": "🌿", "color": "#10B981"},
+    {"id": "space_pod", "name": "Space Pod", "cost": 20, "emoji": "🚀", "color": "#1E1B4B"},
+    {"id": "nature_nest", "name": "Nature Nest", "cost": 30, "emoji": "🌿", "color": "#10B981"},
 ]
 
 

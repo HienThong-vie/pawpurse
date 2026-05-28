@@ -17,7 +17,7 @@ function AuthLayout({ title, description, children }: AuthLayoutProps) {
           <div className="animate-element animate-delay-100 flex items-center gap-2 mb-10">
             <PawPrint className="inline-block w-auto h-auto text-emerald-500 dark:text-[#e8643a]" />
             <span className="text-sm font-semibold tracking-wide text-gray-700 dark:text-[rgb(224,224,224)]">
-              PAW PURSE
+              PAWPURSE
             </span>
           </div>
           <h1 className="animate-element animate-delay-200 text-3xl md:text-4xl font-bold tracking-tight leading-tight mb-2">
@@ -36,7 +36,7 @@ function AuthLayout({ title, description, children }: AuthLayoutProps) {
           <FeatureCarousel />
         </div>
         <p className="mt-8 text-xs text-gray-400 dark:text-[#555]">
-          © {new Date().getFullYear()} Pawpurse
+          © {new Date().getFullYear()} PawPurse
         </p>
       </section>
     </div>

@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { apiFetch } from "../lib/api";
+import { apiFetch, API_BASE } from "../lib/api";
 import { useAuth } from "./AuthContext";
 
 export type NotificationItem = {
@@ -45,7 +45,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
     setLoading(true);
     try {
-      const res = await apiFetch("http://localhost:8000/notifications/");
+      const res = await apiFetch(`${API_BASE}/notifications/`);
       const data = (await res.json()) as NotificationItem[];
       setNotifications(data);
     } catch (err) {
@@ -64,7 +64,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
     );
     try {
-      await apiFetch(`http://localhost:8000/notifications/${id}/read`, {
+      await apiFetch(`${API_BASE}/notifications/${id}/read`, {
         method: "PATCH",
       });
     } catch (err) {
@@ -75,7 +75,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const markAllRead = useCallback(async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     try {
-      await apiFetch(`http://localhost:8000/notifications/read-all`, {
+      await apiFetch(`${API_BASE}/notifications/read-all`, {
         method: "PATCH",
       });
     } catch (err) {
@@ -86,7 +86,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const deleteOne = useCallback(async (id: number) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
     try {
-      await apiFetch(`http://localhost:8000/notifications/${id}`, {
+      await apiFetch(`${API_BASE}/notifications/${id}`, {
         method: "DELETE",
       });
     } catch (err) {

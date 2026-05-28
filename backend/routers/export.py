@@ -47,7 +47,7 @@ def export_pdf(user_id: str = Depends(get_current_user), db: Session = Depends(g
     pdf.set_font("Helvetica", size=12)
 
     # title
-    pdf.cell(0, 10, "Pawpurse - Transaction Report", ln=True, align="C")
+    pdf.cell(0, 10, "PawPurse - Transaction Report", ln=True, align="C")
     pdf.ln(5)
 
     # column headers

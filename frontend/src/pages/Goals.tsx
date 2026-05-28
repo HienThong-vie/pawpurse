@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { formatCurrency, fetchBaseCurrency } from "../lib/utils";
-import { apiFetch } from "../lib/api";
+import { apiFetch, API_BASE } from "../lib/api";
 import ErrorBanner from "../components/ErrorBanner";
 
 type GoalFieldErrors = {
@@ -74,7 +74,7 @@ function Goals() {
       const currency = await fetchBaseCurrency();
       setBaseCurrency(currency);
       const goalsResponse = await apiFetch(
-        `http://localhost:8000/goals/?base_currency=${currency}`,
+        `${API_BASE}/goals/?base_currency=${currency}`,
       );
       const goalsData = await goalsResponse.json();
       setGoals(goalsData);
@@ -94,7 +94,7 @@ function Goals() {
     const goalCurrency = goal.currency || "USD";
     if (goalCurrency === baseCurrency) return newBase;
     const ratesRes = await apiFetch(
-      `http://localhost:8000/currency/rates?base=${baseCurrency}`,
+      `${API_BASE}/currency/rates?base=${baseCurrency}`,
     );
     const ratesData = await ratesRes.json();
     const rates = ratesData.rates || {};
@@ -122,7 +122,7 @@ function Goals() {
     setSubmitting(true);
     try {
       if (editId == null) {
-        await apiFetch(`http://localhost:8000/goals/`, {
+        await apiFetch(`${API_BASE}/goals/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -136,7 +136,7 @@ function Goals() {
         });
         toast.success(t("goals.toastAdded"));
       } else {
-        await apiFetch(`http://localhost:8000/goals/${editId}`, {
+        await apiFetch(`${API_BASE}/goals/${editId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -183,7 +183,7 @@ function Goals() {
 
   async function handleDelete(id: number) {
     try {
-      await apiFetch(`http://localhost:8000/goals/${id}`, { method: "DELETE" });
+      await apiFetch(`${API_BASE}/goals/${id}`, { method: "DELETE" });
       initPage();
     } catch (err: any) {
       setError(err.message);
@@ -200,7 +200,7 @@ function Goals() {
     try {
       const newBase = (goal.current_amount ?? 0) + added;
       const newStored = await resolveNewStored(goal, newBase);
-      await apiFetch(`http://localhost:8000/goals/${goal.id}`, {
+      await apiFetch(`${API_BASE}/goals/${goal.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ current_amount: newStored }),
@@ -230,7 +230,7 @@ function Goals() {
     setQuickAddSubmittingId(goal.id);
     try {
       const newStored = await resolveNewStored(goal, newBase);
-      await apiFetch(`http://localhost:8000/goals/${goal.id}`, {
+      await apiFetch(`${API_BASE}/goals/${goal.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ current_amount: newStored }),
@@ -255,7 +255,7 @@ function Goals() {
     setUndoSubmittingId(goal.id);
     try {
       const prevStored = await resolveNewStored(goal, prevBase);
-      await apiFetch(`http://localhost:8000/goals/${goal.id}`, {
+      await apiFetch(`${API_BASE}/goals/${goal.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ current_amount: prevStored }),
@@ -301,7 +301,7 @@ function Goals() {
   }
 
   return (
-    <div className="font-[Inter] overflow-x-hidden">
+    <div className="font-[Inter] overflow-x-clip">
       {/* Page subtitle */}
       <header className="mb-6 lg:mb-8">
         <p className="text-sm text-gray-500 dark:text-[#a0a0a0]">
@@ -415,233 +415,220 @@ function Goals() {
         {t("goals.sectionYourGoals")}
       </p>
 
-      {/* ── GOAL CARDS (scrollable) ── */}
-      <div
-        className="overflow-auto thin-scrollbar"
-        style={{ maxHeight: "calc(100vh - 360px)", minHeight: "200px" }}
-      >
-        {goals.length > 0 ? (
-          <div className="grid grid-cols-1 min-[1400px]:grid-cols-2 gap-4 pb-1">
-            {goals.map((goal) => {
-              const pct =
-                goal.target_amount > 0
-                  ? (goal.current_amount / goal.target_amount) * 100
-                  : 0;
-              const pctClamped = Math.min(pct, 100);
-              const isComplete = pct >= 100;
-              const deadlineLabel = goal.deadline
-                ? goal.deadline.split("T")[0]
-                : t("goals.noDeadline");
-              const anySubmitting =
-                progressSubmittingId === goal.id ||
-                quickAddSubmittingId === goal.id;
+      {/* ── GOAL CARDS ── */}
+      {goals.length > 0 ? (
+        <div className="grid grid-cols-1 min-[1400px]:grid-cols-2 gap-4 pb-1">
+          {goals.map((goal) => {
+            const pct =
+              goal.target_amount > 0
+                ? (goal.current_amount / goal.target_amount) * 100
+                : 0;
+            const pctClamped = Math.min(pct, 100);
+            const isComplete = pct >= 100;
+            const deadlineLabel = goal.deadline
+              ? goal.deadline.split("T")[0]
+              : t("goals.noDeadline");
+            const anySubmitting =
+              progressSubmittingId === goal.id ||
+              quickAddSubmittingId === goal.id;
 
-              return (
-                <div
-                  key={goal.id}
-                  className="bg-white dark:bg-[var(--bg-surface)] rounded-xl border border-gray-200 dark:border-[var(--bd)] shadow-sm p-4"
-                >
-                  {/* ── TOP SECTION ── */}
-                  <div className="flex items-start gap-2.5">
-                    {/* Icon */}
-                    <div className="w-9 h-9 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center mt-0.5">
-                      <span role="img" aria-label="bullseye">
-                        🎯
-                      </span>
-                    </div>
+            return (
+              <div
+                key={goal.id}
+                className="bg-white dark:bg-[var(--bg-surface)] rounded-xl border border-gray-200 dark:border-[var(--bd)] shadow-sm p-4"
+              >
+                {/* ── TOP SECTION ── */}
+                <div className="flex items-start gap-2.5">
+                  {/* Icon */}
+                  <div className="w-9 h-9 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center mt-0.5">
+                    <span role="img" aria-label="bullseye">
+                      🎯
+                    </span>
+                  </div>
 
-                    {/* Name block */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        {/* Left: name + deadline + mobile amounts */}
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-bold text-gray-900 dark:text-white truncate leading-snug">
-                            {goal.name}
+                  {/* Name block */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      {/* Left: name + deadline + mobile amounts */}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-gray-900 dark:text-white truncate leading-snug">
+                          {goal.name}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-[#a0a0a0] mt-0.5">
+                          {t("goals.deadlineLabel")} · {deadlineLabel}
+                        </p>
+                        {/* Mobile: percentage + amounts shown inline below deadline */}
+                        <div className="sm:hidden flex items-baseline gap-2 mt-1.5 flex-wrap">
+                          <span
+                            className={`text-base font-bold ${isComplete ? "text-emerald-600 dark:text-emerald-400" : "text-gray-900 dark:text-white"}`}
+                          >
+                            {Math.round(pct)}%
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-[#a0a0a0] tabular-nums">
+                            {formatCurrency(goal.current_amount, baseCurrency)}{" "}
+                            / {formatCurrency(goal.target_amount, baseCurrency)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Right: desktop percentage + amounts + three-dot menu */}
+                      <div className="flex items-start gap-1.5 shrink-0">
+                        {/* Desktop: percentage + amounts */}
+                        <div className="hidden sm:block text-right">
+                          <p
+                            className={`text-base font-bold leading-snug ${isComplete ? "text-emerald-600 dark:text-emerald-400" : "text-gray-900 dark:text-white"}`}
+                          >
+                            {Math.round(pct)}%
                           </p>
-                          <p className="text-xs text-gray-500 dark:text-[#a0a0a0] mt-0.5">
-                            {t("goals.deadlineLabel")} · {deadlineLabel}
+                          <p className="text-xs text-gray-500 dark:text-[#a0a0a0] tabular-nums mt-0.5">
+                            {formatCurrency(goal.current_amount, baseCurrency)}{" "}
+                            / {formatCurrency(goal.target_amount, baseCurrency)}
                           </p>
-                          {/* Mobile: percentage + amounts shown inline below deadline */}
-                          <div className="sm:hidden flex items-baseline gap-2 mt-1.5 flex-wrap">
-                            <span
-                              className={`text-base font-bold ${isComplete ? "text-emerald-600 dark:text-emerald-400" : "text-gray-900 dark:text-white"}`}
-                            >
-                              {Math.round(pct)}%
-                            </span>
-                            <span className="text-xs text-gray-500 dark:text-[#a0a0a0] tabular-nums">
-                              {formatCurrency(
-                                goal.current_amount,
-                                baseCurrency,
-                              )}{" "}
-                              /{" "}
-                              {formatCurrency(goal.target_amount, baseCurrency)}
-                            </span>
-                          </div>
                         </div>
 
-                        {/* Right: desktop percentage + amounts + three-dot menu */}
-                        <div className="flex items-start gap-1.5 shrink-0">
-                          {/* Desktop: percentage + amounts */}
-                          <div className="hidden sm:block text-right">
-                            <p
-                              className={`text-base font-bold leading-snug ${isComplete ? "text-emerald-600 dark:text-emerald-400" : "text-gray-900 dark:text-white"}`}
-                            >
-                              {Math.round(pct)}%
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-[#a0a0a0] tabular-nums mt-0.5">
-                              {formatCurrency(
-                                goal.current_amount,
-                                baseCurrency,
-                              )}{" "}
-                              /{" "}
-                              {formatCurrency(goal.target_amount, baseCurrency)}
-                            </p>
-                          </div>
+                        {/* Three-dot dropdown */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenMenuId(
+                                openMenuId === goal.id ? null : goal.id,
+                              )
+                            }
+                            className="p-1 rounded-md text-gray-400 dark:text-[#666] hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[var(--bg-hover)] transition-colors"
+                            aria-label="Goal options"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
 
-                          {/* Three-dot dropdown */}
-                          <div className="relative">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setOpenMenuId(
-                                  openMenuId === goal.id ? null : goal.id,
-                                )
-                              }
-                              className="p-1 rounded-md text-gray-400 dark:text-[#666] hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[var(--bg-hover)] transition-colors"
-                              aria-label="Goal options"
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </button>
-
-                            {openMenuId === goal.id && (
-                              <>
-                                <div
-                                  className="fixed inset-0 z-40"
-                                  onClick={() => setOpenMenuId(null)}
-                                />
-                                <div className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-[var(--bg-surface)] border border-gray-200 dark:border-[var(--bd)] rounded-xl shadow-lg z-50 overflow-hidden py-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      handleEdit(goal);
-                                      setOpenMenuId(null);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-[#e0e0e0] hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] transition-colors text-left"
-                                  >
-                                    <Pencil className="w-3.5 h-3.5" />
-                                    {t("goals.menuEdit")}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      handleDelete(goal.id);
-                                      setOpenMenuId(null);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors text-left"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                    {t("goals.menuDelete")}
-                                  </button>
-                                </div>
-                              </>
-                            )}
-                          </div>
+                          {openMenuId === goal.id && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-40"
+                                onClick={() => setOpenMenuId(null)}
+                              />
+                              <div className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-[var(--bg-surface)] border border-gray-200 dark:border-[var(--bd)] rounded-xl shadow-lg z-50 overflow-hidden py-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleEdit(goal);
+                                    setOpenMenuId(null);
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-[#e0e0e0] hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] transition-colors text-left"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                  {t("goals.menuEdit")}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleDelete(goal.id);
+                                    setOpenMenuId(null);
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors text-left"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  {t("goals.menuDelete")}
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
                   </div>
-
-                  {/* ── PROGRESS BAR ── */}
-                  <div className="mt-3 w-full h-1.5 bg-gray-100 dark:bg-[var(--bg-muted)] rounded-full overflow-hidden">
-                    <div
-                      className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${pctClamped}%` }}
-                    />
-                  </div>
-
-                  {/* ── BOTTOM SECTION: amount input + quick-add buttons ── */}
-                  <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
-                    {/* Custom amount input */}
-                    <div className="flex gap-1.5 flex-1 min-w-0">
-                      <input
-                        type="number"
-                        placeholder={t("goals.addAmountPlaceholder")}
-                        min="0"
-                        value={progressInput[goal.id] ?? ""}
-                        onChange={(e) =>
-                          setProgressInput((prev) => ({
-                            ...prev,
-                            [goal.id]: e.target.value,
-                          }))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleAddProgress(goal);
-                        }}
-                        className="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-[var(--bd)] bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                      <button
-                        onClick={() => handleAddProgress(goal)}
-                        disabled={anySubmitting}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-xs font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
-                      >
-                        {progressSubmittingId === goal.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Plus className="w-3.5 h-3.5" />
-                        )}
-                        {t("goals.addBtn")}
-                      </button>
-                    </div>
-
-                    {/* Percentage quick-add buttons */}
-                    <div className="flex gap-1.5">
-                      {([-1, 1, 5] as const).map((p) => (
-                        <button
-                          key={p}
-                          type="button"
-                          onClick={() => handleQuickAdd(goal, p)}
-                          disabled={anySubmitting}
-                          className="flex-1 sm:flex-none px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-[var(--bd)] text-xs font-medium text-gray-600 dark:text-[#e0e0e0] hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                        >
-                          {p > 0 ? `+${p}%` : `${p}%`}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Undo last addition */}
-                  {previousAmounts[goal.id] !== undefined && (
-                    <button
-                      onClick={() => handleUndoProgress(goal)}
-                      disabled={undoSubmittingId === goal.id}
-                      className="mt-2 flex items-center gap-1 text-xs text-gray-400 dark:text-[#666] hover:text-gray-600 dark:hover:text-[#a0a0a0] transition-colors disabled:opacity-50"
-                    >
-                      {undoSubmittingId === goal.id ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <RotateCcw className="w-3 h-3" />
-                      )}
-                      {t("goals.undoLastAddition")}
-                    </button>
-                  )}
                 </div>
-              );
-            })}
+
+                {/* ── PROGRESS BAR ── */}
+                <div className="mt-3 w-full h-1.5 bg-gray-100 dark:bg-[var(--bg-muted)] rounded-full overflow-hidden">
+                  <div
+                    className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                    style={{ width: `${pctClamped}%` }}
+                  />
+                </div>
+
+                {/* ── BOTTOM SECTION: amount input + quick-add buttons ── */}
+                <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
+                  {/* Custom amount input */}
+                  <div className="flex gap-1.5 flex-1 min-w-0">
+                    <input
+                      type="number"
+                      placeholder={t("goals.addAmountPlaceholder")}
+                      min="0"
+                      value={progressInput[goal.id] ?? ""}
+                      onChange={(e) =>
+                        setProgressInput((prev) => ({
+                          ...prev,
+                          [goal.id]: e.target.value,
+                        }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAddProgress(goal);
+                      }}
+                      className="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-[var(--bd)] bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <button
+                      onClick={() => handleAddProgress(goal)}
+                      disabled={anySubmitting}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-xs font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+                    >
+                      {progressSubmittingId === goal.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Plus className="w-3.5 h-3.5" />
+                      )}
+                      {t("goals.addBtn")}
+                    </button>
+                  </div>
+
+                  {/* Percentage quick-add buttons */}
+                  <div className="flex gap-1.5">
+                    {([-1, 1, 5] as const).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => handleQuickAdd(goal, p)}
+                        disabled={anySubmitting}
+                        className="flex-1 sm:flex-none px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-[var(--bd)] text-xs font-medium text-gray-600 dark:text-[#e0e0e0] hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                      >
+                        {p > 0 ? `+${p}%` : `${p}%`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Undo last addition */}
+                {previousAmounts[goal.id] !== undefined && (
+                  <button
+                    onClick={() => handleUndoProgress(goal)}
+                    disabled={undoSubmittingId === goal.id}
+                    className="mt-2 flex items-center gap-1 text-xs text-gray-400 dark:text-[#666] hover:text-gray-600 dark:hover:text-[#a0a0a0] transition-colors disabled:opacity-50"
+                  >
+                    {undoSubmittingId === goal.id ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <RotateCcw className="w-3 h-3" />
+                    )}
+                    {t("goals.undoLastAddition")}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-[var(--bg-surface)] rounded-xl border border-gray-300 dark:border-[var(--bd)] shadow-sm p-12 flex flex-col items-center text-center">
+          <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-[#e8643a]/10 flex items-center justify-center mb-3">
+            <Target className="w-6 h-6 text-emerald-600 dark:text-[#e8643a]" />
           </div>
-        ) : (
-          <div className="bg-white dark:bg-[var(--bg-surface)] rounded-xl border border-gray-300 dark:border-[var(--bd)] shadow-sm p-12 flex flex-col items-center text-center">
-            <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-[#e8643a]/10 flex items-center justify-center mb-3">
-              <Target className="w-6 h-6 text-emerald-600 dark:text-[#e8643a]" />
-            </div>
-            <p className="text-base font-semibold text-gray-900 dark:text-white mb-1">
-              {t("goals.noGoalsTitle")}
-            </p>
-            <p className="text-sm text-gray-500 dark:text-[#a0a0a0]">
-              {t("goals.noGoalsDesc")}
-            </p>
-          </div>
-        )}
-      </div>
+          <p className="text-base font-semibold text-gray-900 dark:text-white mb-1">
+            {t("goals.noGoalsTitle")}
+          </p>
+          <p className="text-sm text-gray-500 dark:text-[#a0a0a0]">
+            {t("goals.noGoalsDesc")}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

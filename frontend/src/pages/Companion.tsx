@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
-import { apiFetch } from "../lib/api";
+import { apiFetch, API_BASE } from "../lib/api";
 import { useToast } from "../context/ToastContext";
 import { getBed, MASCOT_UPDATED_EVENT } from "../lib/shopBeds";
 
@@ -35,8 +35,8 @@ function Companion() {
 
   async function refresh() {
     const [m, s] = await Promise.all([
-      apiFetch("http://localhost:8000/mascot/").then((r) => r.json()),
-      apiFetch("http://localhost:8000/mascot/shop").then((r) => r.json()),
+      apiFetch(`${API_BASE}/mascot/`).then((r) => r.json()),
+      apiFetch(`${API_BASE}/mascot/shop`).then((r) => r.json()),
     ]);
     setMascot(m);
     setShop(s);
@@ -62,7 +62,7 @@ function Companion() {
   async function handleBuy(item: ShopItem) {
     setActingBedId(item.id);
     try {
-      await apiFetch("http://localhost:8000/mascot/buy", {
+      await apiFetch(`${API_BASE}/mascot/buy`, {
         method: "POST",
         body: JSON.stringify({ bed_id: item.id }),
       });
@@ -79,7 +79,7 @@ function Companion() {
   async function handleEquip(item: ShopItem) {
     setActingBedId(item.id);
     try {
-      await apiFetch("http://localhost:8000/mascot/equip", {
+      await apiFetch(`${API_BASE}/mascot/equip`, {
         method: "PATCH",
         body: JSON.stringify({ bed_id: item.id }),
       });

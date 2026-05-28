@@ -16,11 +16,11 @@ export function formatDate(dateStr: string | null | undefined): string {
   });
 }
 
-import { apiFetch } from "./api";
+import { apiFetch, API_BASE } from "./api";
 
 export async function fetchBaseCurrency(): Promise<string> {
   try {
-    const response = await apiFetch("http://localhost:8000/settings/");
+    const response = await apiFetch(`${API_BASE}/settings/`);
     const data = await response.json();
     return data.base_currency || "USD";
   } catch {

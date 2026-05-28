@@ -13,13 +13,16 @@ import {
   Pin,
   Pencil,
   Trash2,
+  Menu,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useOutletContext } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { useConfirm } from "../context/ConfirmContext";
-import { apiFetch } from "../lib/api";
+import { apiFetch, API_BASE } from "../lib/api";
 import supabase from "../lib/supabaseClient";
+import type { LayoutOutletContext } from "../components/layout";
 
 type Message = {
   id: string;
@@ -153,6 +156,7 @@ function Advisor() {
   const { user, username } = useAuth();
   const toast = useToast();
   const { confirm } = useConfirm();
+  const { openSidebar } = useOutletContext<LayoutOutletContext>();
 
   const companionType =
     (user?.user_metadata?.companion as string | undefined) ??
@@ -261,7 +265,7 @@ function Advisor() {
       try {
         const session = (await supabase.auth.getSession()).data.session;
         if (!session) return;
-        const r = await apiFetch("http://localhost:8000/advisor/usage");
+        const r = await apiFetch(`${API_BASE}/advisor/usage`);
         const data = await r.json();
         if (!cancelled) setUsage(data);
       } catch {
@@ -426,7 +430,7 @@ function Advisor() {
     };
 
     try {
-      const r = await apiFetch("http://localhost:8000/advisor/chat", {
+      const r = await apiFetch(`${API_BASE}/advisor/chat`, {
         method: "POST",
         body: JSON.stringify(payload),
       });
@@ -454,7 +458,7 @@ function Advisor() {
       if (message.includes("429")) {
         // Refresh usage so the limit popup fires via the usage effect
         try {
-          const u = await apiFetch("http://localhost:8000/advisor/usage");
+          const u = await apiFetch(`${API_BASE}/advisor/usage`);
           setUsage(await u.json());
         } catch {
           /* ignore */
@@ -493,10 +497,17 @@ function Advisor() {
     .sort((a, b) => Number(b.pinned ?? false) - Number(a.pinned ?? false));
 
   return (
-    <div className="-m-4 lg:-m-8 flex flex-col h-[calc(100dvh-2.75rem)] lg:h-dvh overflow-hidden font-[Inter]">
+    <div className="-m-4 lg:-m-8 flex flex-col h-dvh overflow-hidden font-[Inter]">
       {/* === Top bar === */}
       <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[var(--bd)] bg-white dark:bg-[var(--bg-page)] relative">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            onClick={openSidebar}
+            className="lg:hidden p-1.5 -ml-1 rounded-md text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-[var(--bg-hover)]"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
           {companionEmoji ? (
             <span className="text-xl leading-none" aria-hidden="true">
               {companionEmoji}
@@ -504,7 +515,7 @@ function Advisor() {
           ) : (
             <Sparkles className="w-5 h-5 text-emerald-500 dark:text-[#e8643a]" />
           )}
-          <span className="font-bold text-gray-900 dark:text-white text-sm">
+          <span className="font-bold text-gray-900 dark:text-white text-sm truncate">
             {companionName || t("advisor.title")}
           </span>
         </div>

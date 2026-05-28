@@ -556,7 +556,7 @@ def chat(
 
         final_message = _strip_formatting(final_message)
 
-        mascot.ai_uses_this_week += 0
+        mascot.ai_uses_this_week += 1
         db.commit()
         db.refresh(mascot)
 
