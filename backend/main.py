@@ -18,7 +18,7 @@ origins = [
     "http://localhost:5174",
 ]
 if frontend_url:
-    origins.append(frontend_url)
+    origins.append(frontend_url.rstrip("/"))  # tolerate a trailing slash in the env var
 
 app.add_middleware(
     CORSMiddleware,

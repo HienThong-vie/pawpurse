@@ -1,8 +1,9 @@
 import supabase from "./supabaseClient";
 
-export const API_BASE: string =
+export const API_BASE: string = (
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ||
-  "http://localhost:8000";
+  "http://localhost:8000"
+).replace(/\/+$/, ""); // strip trailing slash(es) so `${API_BASE}/x` never yields `//x`
 
 export async function apiFetch(
   url: string,
