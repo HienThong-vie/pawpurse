@@ -591,6 +591,7 @@ function Advisor() {
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err ?? "");
+      console.error("[Advisor] chat error:", message);
       if (message.includes("429")) {
         try {
           const u = await apiFetch(`${API_BASE}/advisor/usage`);
@@ -598,8 +599,14 @@ function Advisor() {
         } catch {
           /* ignore */
         }
+      } else if (message.includes("400") && message.toLowerCase().includes("companion")) {
+        toast.error("Please visit the Companion page first to set up your advisor.");
+      } else if (message.includes("503")) {
+        toast.error("The AI service is busy — please try again in a moment.");
       } else {
-        toast.error(t("advisor.errorGeneric"));
+        // Show the backend's own detail if available, otherwise the generic message
+        const detail = message.replace(/^Request failed \(\d+\):\s*/, "").trim();
+        toast.error(detail || t("advisor.errorGeneric"));
       }
     } finally {
       setThinking(false);
