@@ -17,6 +17,8 @@ app = FastAPI()
 origins = [
     "http://localhost:5173",
     "http://localhost:5174",
+    "http://localhost:5175",
+    "http://localhost:5176",
 ]
 if frontend_url:
     origins.append(frontend_url.rstrip("/"))  # tolerate a trailing slash in the env var

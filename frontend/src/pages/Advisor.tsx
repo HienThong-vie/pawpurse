@@ -267,7 +267,7 @@ function Advisor() {
     [],
   );
 
-  // Load chats from backend on mount
+  // Load chats: try backend first, fall back to localStorage
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -275,32 +275,56 @@ function Advisor() {
         const session = (await supabase.auth.getSession()).data.session;
         if (!session || cancelled) return;
 
-        const [chatsRes, usageRes] = await Promise.all([
-          apiFetch(`${API_BASE}/advisor/chats`),
-          apiFetch(`${API_BASE}/advisor/usage`),
-        ]);
-        const serverChats: Chat[] = await chatsRes.json();
-        const usageData: Usage = await usageRes.json();
-
-        if (cancelled) return;
-
-        setChats(serverChats);
-        setUsage(usageData);
-
-        // Restore last active chat
-        const savedActiveId = user?.id
-          ? localStorage.getItem(`advisor_active_chat_${user.id}`)
-          : null;
-        if (savedActiveId && serverChats.some((c) => c.id === savedActiveId)) {
-          setActiveChatId(savedActiveId);
+        // Fetch usage (always works — existing endpoint)
+        try {
+          const usageRes = await apiFetch(`${API_BASE}/advisor/usage`);
+          if (!cancelled) setUsage(await usageRes.json());
+        } catch {
+          /* usage stays null */
         }
 
-        // One-time migration from localStorage
-        if (user?.id) {
-          await migrateLocalStorage(user.id, serverChats);
+        // Try to fetch chats from backend; fall back to localStorage on any error
+        let loaded = false;
+        try {
+          const chatsRes = await apiFetch(`${API_BASE}/advisor/chats`);
+          const serverChats: Chat[] = await chatsRes.json();
+          if (!cancelled) {
+            setChats(serverChats);
+            loaded = true;
+            const savedActiveId = user?.id
+              ? localStorage.getItem(`advisor_active_chat_${user.id}`)
+              : null;
+            if (savedActiveId && serverChats.some((c) => c.id === savedActiveId)) {
+              setActiveChatId(savedActiveId);
+            }
+            // One-time migration from localStorage
+            if (user?.id) {
+              await migrateLocalStorage(user.id, serverChats);
+            }
+          }
+        } catch {
+          /* backend chat endpoints not yet deployed — fall back to localStorage */
+        }
+
+        // localStorage fallback (same device, or backend not yet deployed)
+        if (!loaded && user?.id && !cancelled) {
+          try {
+            const lsKey = `advisor_chats_${user.id}`;
+            const raw = localStorage.getItem(lsKey);
+            if (raw) {
+              const parsed = JSON.parse(raw) as Chat[];
+              setChats(parsed);
+              const savedId = localStorage.getItem(`advisor_active_chat_${user.id}`);
+              if (savedId && parsed.some((c) => c.id === savedId)) {
+                setActiveChatId(savedId);
+              }
+            }
+          } catch {
+            /* localStorage unavailable */
+          }
         }
       } catch {
-        // Silent — UI remains functional with empty chat list
+        /* silent */
       } finally {
         if (!cancelled) setChatsLoading(false);
       }
@@ -310,7 +334,17 @@ function Advisor() {
     };
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Persist active chat id locally (just the ID, not full content)
+  // Persist chats to localStorage as a safety net (works even when backend is down)
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      localStorage.setItem(`advisor_chats_${user.id}`, JSON.stringify(chats));
+    } catch {
+      /* ignore quota errors */
+    }
+  }, [chats, user?.id]);
+
+  // Persist active chat id locally
   useEffect(() => {
     if (!user?.id) return;
     try {
@@ -357,19 +391,25 @@ function Advisor() {
     : "";
 
   async function handleNewChat() {
+    let newId = uid();
+    let newCreatedAt = new Date().toISOString();
+    // Try to create on backend; fall back to local-only if unavailable
     try {
       const r = await apiFetch(`${API_BASE}/advisor/chats`, {
         method: "POST",
         body: JSON.stringify({ title: "New Chat" }),
       });
       const chat: Chat = await r.json();
-      setChats((prev) => [chat, ...prev]);
-      setActiveChatId(chat.id);
-      setSearchOpen(false);
-      setTimeout(() => emptyInputRef.current?.focus(), 250);
+      newId = chat.id;
+      newCreatedAt = chat.created_at;
     } catch {
-      toast.error(t("advisor.errorGeneric"));
+      /* backend not yet deployed — use local ID */
     }
+    const newChat: Chat = { id: newId, title: "New Chat", messages: [], pinned: false, created_at: newCreatedAt };
+    setChats((prev) => [newChat, ...prev]);
+    setActiveChatId(newId);
+    setSearchOpen(false);
+    setTimeout(() => emptyInputRef.current?.focus(), 250);
   }
 
   function openChatMenu(e: React.MouseEvent, chatId: string) {
@@ -457,20 +497,24 @@ function Advisor() {
     let messageHistory: Message[] = [];
 
     if (!chatId) {
-      // Create a new chat on the backend first
+      // Try to create chat on backend; fall back to local-only ID so the AI call always proceeds
+      let newId = uid();
+      let newCreatedAt = new Date().toISOString();
       try {
         const r = await apiFetch(`${API_BASE}/advisor/chats`, {
           method: "POST",
           body: JSON.stringify({ title: content.slice(0, 40) }),
         });
-        const newChat: Chat = await r.json();
-        setChats((prev) => [newChat, ...prev]);
-        setActiveChatId(newChat.id);
-        chatId = newChat.id;
+        const created: Chat = await r.json();
+        newId = created.id;
+        newCreatedAt = created.created_at;
       } catch {
-        toast.error(t("advisor.errorGeneric"));
-        return;
+        /* backend not yet deployed — local-only chat */
       }
+      const newChat: Chat = { id: newId, title: content.slice(0, 40), messages: [], pinned: false, created_at: newCreatedAt };
+      setChats((prev) => [newChat, ...prev]);
+      setActiveChatId(newId);
+      chatId = newId;
     } else {
       messageHistory = chats.find((c) => c.id === chatId)?.messages ?? [];
       // Auto-title from first message if still "New Chat"
