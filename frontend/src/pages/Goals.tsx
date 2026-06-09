@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, type Dispatch, type SetStateAction } from "react";
 import {
   Pencil,
   Trash2,
@@ -7,6 +7,7 @@ import {
   Loader2,
   RotateCcw,
   MoreVertical,
+  X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
@@ -35,6 +36,216 @@ function roundForCurrency(amount: number, currency: string): number {
   return NO_DECIMAL_CURRENCIES.has(currency.toUpperCase())
     ? Math.round(amount)
     : Math.round(amount * 100) / 100;
+}
+
+// ─── GoalFormModal ────────────────────────────────────────────────────────────
+
+type GoalFormModalProps = {
+  open: boolean;
+  onClose: () => void;
+  editId: number | null;
+  name: string;
+  setName: (v: string) => void;
+  target_amount: string;
+  setTargetAmount: (v: string) => void;
+  deadline: string;
+  setDeadline: (v: string) => void;
+  fieldErrors: GoalFieldErrors;
+  setFieldErrors: Dispatch<SetStateAction<GoalFieldErrors>>;
+  submitting: boolean;
+  onSubmit: () => void;
+  onCancel: () => void;
+};
+
+function GoalFormModal({
+  open,
+  onClose,
+  editId,
+  name,
+  setName,
+  target_amount,
+  setTargetAmount,
+  deadline,
+  setDeadline,
+  fieldErrors,
+  setFieldErrors,
+  submitting,
+  onSubmit,
+  onCancel,
+}: GoalFormModalProps) {
+  const { t } = useTranslation();
+  const [rendered, setRendered] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setRendered(true);
+      requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)));
+    } else {
+      setVisible(false);
+      const timer = setTimeout(() => setRendered(false), 250);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [open, onClose]);
+
+  if (!rendered) return null;
+
+  return (
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${
+        visible ? "opacity-100" : "opacity-0 pointer-events-none"
+      }`}
+    >
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        className={`relative w-full max-w-md bg-white dark:bg-[var(--bg-surface)] rounded-2xl shadow-2xl border border-gray-200 dark:border-[var(--bd)] transition-all duration-200 ${
+          visible ? "scale-100 translate-y-0" : "scale-95 translate-y-4"
+        }`}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-[var(--bd)]">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+            {editId != null ? t("goals.updateGoalBtn") : t("goals.addGoalBtn")}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-gray-400 dark:text-[#555] hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[var(--bg-hover)] transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-5 space-y-4 overflow-y-auto max-h-[calc(100vh-8rem)] thin-scrollbar">
+          {/* Goal name */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-[#a0a0a0] mb-1.5">
+              {t("goals.goalNamePlaceholder")} *
+            </label>
+            <input
+              autoFocus
+              type="text"
+              placeholder={t("goals.goalNamePlaceholder")}
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setFieldErrors((p) => ({ ...p, name: undefined }));
+              }}
+              className={`w-full px-3.5 py-2.5 text-sm rounded-lg border ${
+                fieldErrors.name
+                  ? "border-red-400 dark:border-red-500/60"
+                  : "border-gray-300 dark:border-[var(--bd)]"
+              } bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a]`}
+            />
+            {fieldErrors.name && (
+              <p className="mt-1 text-xs text-red-500">{fieldErrors.name}</p>
+            )}
+          </div>
+
+          {/* Target amount */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-[#a0a0a0] mb-1.5">
+              {t("goals.targetAmountPlaceholder")} *
+            </label>
+            <input
+              type="number"
+              placeholder={t("goals.targetAmountPlaceholder")}
+              value={target_amount}
+              onChange={(e) => {
+                setTargetAmount(e.target.value);
+                setFieldErrors((p) => ({ ...p, target_amount: undefined }));
+              }}
+              className={`w-full px-3.5 py-2.5 text-sm rounded-lg border ${
+                fieldErrors.target_amount
+                  ? "border-red-400 dark:border-red-500/60"
+                  : "border-gray-300 dark:border-[var(--bd)]"
+              } bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+            />
+            {fieldErrors.target_amount && (
+              <p className="mt-1 text-xs text-red-500">
+                {fieldErrors.target_amount}
+              </p>
+            )}
+          </div>
+
+          {/* Deadline */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-[#a0a0a0] mb-1.5">
+              {t("goals.deadlineLabel")}{" "}
+              <span className="font-normal">(optional)</span>
+            </label>
+            <input
+              type="date"
+              value={deadline}
+              onChange={(e) => {
+                setDeadline(e.target.value);
+                setFieldErrors((p) => ({ ...p, deadline: undefined }));
+              }}
+              className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-gray-300 dark:border-[var(--bd)] bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a] dark:[color-scheme:dark]"
+            />
+            {fieldErrors.deadline && (
+              <p className="mt-1 text-xs text-red-500">{fieldErrors.deadline}</p>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2 pt-1">
+            {editId != null && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="flex-1 py-2.5 rounded-lg border border-gray-300 dark:border-[var(--bd)] text-sm font-semibold text-gray-600 dark:text-[#aaa] hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                {t("common.cancel")}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={submitting}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {submitting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
+              {submitting
+                ? editId != null
+                  ? t("goals.updatingBtn")
+                  : t("goals.addingBtn")
+                : editId != null
+                  ? t("goals.updateGoalBtn")
+                  : t("goals.addGoalBtn")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Goals() {
@@ -68,6 +279,7 @@ function Goals() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<GoalFieldErrors>({});
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
 
   const initPage = useCallback(async () => {
     try {
@@ -157,6 +369,7 @@ function Goals() {
       setCurrentAmount("");
       setDeadline("");
       setFieldErrors({});
+      setShowModal(false);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -170,7 +383,11 @@ function Goals() {
     setCurrentAmount(String(goal.current_amount));
     setTargetAmount(String(goal.target_amount));
     setDeadline(goal.deadline?.split("T")[0] || "");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (window.innerWidth < 1280) {
+      setShowModal(true);
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }
 
   function handleCancelEdit() {
@@ -179,6 +396,7 @@ function Goals() {
     setTargetAmount("");
     setCurrentAmount("");
     setDeadline("");
+    setShowModal(false);
   }
 
   async function handleDelete(id: number) {
@@ -311,7 +529,18 @@ function Goals() {
         {t("goals.sectionGoal")}
       </p>
 
-      {/* ── UNIFIED INPUT BAR ── */}
+      {/* Mobile / tablet trigger — hidden at xl+ */}
+      <button
+        type="button"
+        onClick={() => setShowModal(true)}
+        className="xl:hidden w-full flex items-center justify-center gap-2 mb-4 px-4 py-3 rounded-xl bg-emerald-500 dark:bg-[#e8643a] text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors"
+      >
+        <Plus className="w-4 h-4" />
+        {editId != null ? t("goals.updateGoalBtn") : t("goals.addGoalBtn")}
+      </button>
+
+      {/* ── UNIFIED INPUT BAR (xl+ only) ── */}
+      <div className="hidden xl:block">
       <div className="mt-1">
         <div
           className={`
@@ -402,6 +631,7 @@ function Goals() {
           </p>
         )}
       </div>
+      </div>{/* end hidden xl:block */}
 
       {/* ── SECTION HEADING ── */}
       <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#a0a0a0] mt-5 mb-2">
@@ -622,6 +852,22 @@ function Goals() {
           </p>
         </div>
       )}
+      <GoalFormModal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        editId={editId}
+        name={name}
+        setName={setName}
+        target_amount={target_amount}
+        setTargetAmount={setTargetAmount}
+        deadline={deadline}
+        setDeadline={setDeadline}
+        fieldErrors={fieldErrors}
+        setFieldErrors={setFieldErrors}
+        submitting={submitting}
+        onSubmit={handleSubmit}
+        onCancel={handleCancelEdit}
+      />
     </div>
   );
 }

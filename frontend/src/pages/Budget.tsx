@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, type Dispatch, type SetStateAction } from "react";
 import {
   Pencil,
   Trash2,
@@ -319,6 +319,304 @@ function BudgetDetailModal({
   );
 }
 
+// ─── BudgetFormModal ──────────────────────────────────────────────────────────
+
+type BudgetFormModalProps = {
+  open: boolean;
+  onClose: () => void;
+  editId: number | null;
+  limit: string;
+  setLimit: (v: string) => void;
+  category: string;
+  setCategory: (v: string) => void;
+  period: string;
+  setPeriod: (v: string) => void;
+  fieldErrors: BudgetFieldErrors;
+  setFieldErrors: Dispatch<SetStateAction<BudgetFieldErrors>>;
+  submitting: boolean;
+  categories: any[];
+  emojiByCategory: Record<string, string>;
+  periodLabel: Record<string, string>;
+  onSubmit: () => void;
+  onCancel: () => void;
+  onAddCategory: (name: string) => Promise<void>;
+};
+
+function BudgetFormModal({
+  open,
+  onClose,
+  editId,
+  limit,
+  setLimit,
+  category,
+  setCategory,
+  period,
+  setPeriod,
+  fieldErrors,
+  setFieldErrors,
+  submitting,
+  categories,
+  emojiByCategory,
+  periodLabel,
+  onSubmit,
+  onCancel,
+  onAddCategory,
+}: BudgetFormModalProps) {
+  const { t } = useTranslation();
+  const [rendered, setRendered] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [addingCat, setAddingCat] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [submittingCat, setSubmittingCat] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setRendered(true);
+      requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)));
+    } else {
+      setVisible(false);
+      const timer = setTimeout(() => setRendered(false), 250);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [open, onClose]);
+
+  async function handleAddCat() {
+    if (!newCatName.trim()) return;
+    setSubmittingCat(true);
+    try {
+      await onAddCategory(newCatName.trim());
+      setCategory(newCatName.trim());
+      setNewCatName("");
+      setAddingCat(false);
+    } finally {
+      setSubmittingCat(false);
+    }
+  }
+
+  if (!rendered) return null;
+
+  return (
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${
+        visible ? "opacity-100" : "opacity-0 pointer-events-none"
+      }`}
+    >
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        className={`relative w-full max-w-md bg-white dark:bg-[var(--bg-surface)] rounded-2xl shadow-2xl border border-gray-200 dark:border-[var(--bd)] transition-all duration-200 ${
+          visible ? "scale-100 translate-y-0" : "scale-95 translate-y-4"
+        }`}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-[var(--bd)]">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+            {editId != null
+              ? `${t("budget.updateBtn")} ${t("budget.sectionBudget")}`
+              : `${t("budget.addBtn")} ${t("budget.sectionBudget")}`}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-gray-400 dark:text-[#555] hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[var(--bg-hover)] transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-5 space-y-4 overflow-y-auto max-h-[calc(100vh-8rem)] thin-scrollbar">
+          {/* Limit */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-[#a0a0a0] mb-1.5">
+              {t("budget.limitPlaceholder")} *
+            </label>
+            <input
+              autoFocus
+              type="number"
+              placeholder={t("budget.limitPlaceholder")}
+              value={limit}
+              onChange={(e) => {
+                setLimit(e.target.value);
+                setFieldErrors((p) => ({ ...p, limit: undefined }));
+              }}
+              className={`w-full px-3.5 py-2.5 text-sm rounded-lg border ${
+                fieldErrors.limit
+                  ? "border-red-400 dark:border-red-500/60"
+                  : "border-gray-300 dark:border-[var(--bd)]"
+              } bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+            />
+            {fieldErrors.limit && (
+              <p className="mt-1 text-xs text-red-500">{fieldErrors.limit}</p>
+            )}
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-[#a0a0a0] mb-1.5">
+              {t("budget.selectCategory")} *
+            </label>
+            <select
+              value={category}
+              onChange={(e) => {
+                setCategory(e.target.value);
+                setFieldErrors((p) => ({ ...p, category: undefined }));
+              }}
+              className={`w-full px-3.5 py-2.5 text-sm rounded-lg border ${
+                fieldErrors.category
+                  ? "border-red-400 dark:border-red-500/60"
+                  : "border-gray-300 dark:border-[var(--bd)]"
+              } bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a] dark:[color-scheme:dark]`}
+            >
+              <option value="">{t("budget.selectCategory")}</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.name}>
+                  {emojiByCategory[cat.name.toLowerCase()] || "💼"} {cat.name}
+                </option>
+              ))}
+            </select>
+            {fieldErrors.category && (
+              <p className="mt-1 text-xs text-red-500">{fieldErrors.category}</p>
+            )}
+            {!addingCat ? (
+              <button
+                type="button"
+                onClick={() => setAddingCat(true)}
+                className="mt-2 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-[#e8643a] hover:text-emerald-700 dark:hover:text-[#d2552d] font-medium transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                {t("transactions.addNewCategory")}
+              </button>
+            ) : (
+              <div className="mt-2 flex gap-1.5">
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder={t("transactions.categoryNamePlaceholder")}
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAddCat();
+                    if (e.key === "Escape") {
+                      setAddingCat(false);
+                      setNewCatName("");
+                    }
+                  }}
+                  className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-[var(--bd)] bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a]"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCat}
+                  disabled={submittingCat || !newCatName.trim()}
+                  className="px-2.5 py-1.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-xs font-semibold disabled:opacity-50 hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors"
+                >
+                  {submittingCat ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    t("common.add")
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddingCat(false);
+                    setNewCatName("");
+                  }}
+                  className="px-2 py-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Period */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-[#a0a0a0] mb-1.5">
+              {t("budget.selectPeriod")} *
+            </label>
+            <select
+              value={period}
+              onChange={(e) => {
+                setPeriod(e.target.value);
+                setFieldErrors((p) => ({ ...p, period: undefined }));
+              }}
+              className={`w-full px-3.5 py-2.5 text-sm rounded-lg border ${
+                fieldErrors.period
+                  ? "border-red-400 dark:border-red-500/60"
+                  : "border-gray-300 dark:border-[var(--bd)]"
+              } bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a] dark:[color-scheme:dark]`}
+            >
+              <option value="">{t("budget.selectPeriod")}</option>
+              {["day", "week", "month"].map((p) => (
+                <option key={p} value={p}>
+                  {periodLabel[p] ?? p}
+                </option>
+              ))}
+            </select>
+            {fieldErrors.period && (
+              <p className="mt-1 text-xs text-red-500">{fieldErrors.period}</p>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2 pt-1">
+            {editId != null && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="flex-1 py-2.5 rounded-lg border border-gray-300 dark:border-[var(--bd)] text-sm font-semibold text-gray-600 dark:text-[#aaa] hover:bg-gray-50 dark:hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                {t("common.cancel")}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={submitting}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {submitting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
+              {submitting
+                ? editId != null
+                  ? t("budget.updatingBtn")
+                  : t("budget.addingBtn")
+                : editId != null
+                  ? t("budget.updateBtn")
+                  : t("budget.addBtn")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Budget() {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -377,6 +675,8 @@ function Budget() {
   // Period dropdown state
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
   const periodDropdownRef = useRef<HTMLDivElement>(null);
+  // Mobile modal
+  const [showModal, setShowModal] = useState(false);
 
   // Map category name -> emoji for quick lookup on budget cards
   const emojiByCategory = useMemo(() => {
@@ -398,6 +698,15 @@ function Budget() {
       setError(err.message);
     }
   }, [user?.id]);
+
+  async function handleAddCategorySimple(name: string): Promise<void> {
+    await apiFetch(`${API_BASE}/categories/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: user?.id, name, emoji: "💼" }),
+    });
+    await fetchCategories();
+  }
 
   const fetchBudgets = useCallback(async () => {
     try {
@@ -467,6 +776,7 @@ function Budget() {
     setCategory("");
     setPeriod(defaultPeriod);
     setFieldErrors({});
+    setShowModal(false);
   }
 
   async function handleSubmit() {
@@ -552,7 +862,11 @@ function Budget() {
     setCategory(budget.category);
     setLimit(String(budget.limit));
     setPeriod(budget.period);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (window.innerWidth < 1280) {
+      setShowModal(true);
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }
 
   function handleModalEdit() {
@@ -718,7 +1032,20 @@ function Budget() {
         {t("budget.sectionBudget")}
       </p>
 
-      {/* ── UNIFIED INPUT BAR ── */}
+      {/* Mobile / tablet trigger — hidden at xl+ */}
+      <button
+        type="button"
+        onClick={() => setShowModal(true)}
+        className="xl:hidden w-full flex items-center justify-center gap-2 mb-4 px-4 py-3 rounded-xl bg-emerald-500 dark:bg-[#e8643a] text-white text-sm font-semibold hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors"
+      >
+        <Plus className="w-4 h-4" />
+        {editId != null
+          ? `${t("budget.updateBtn")} ${t("budget.sectionBudget")}`
+          : `${t("budget.addBtn")} ${t("budget.sectionBudget")}`}
+      </button>
+
+      {/* ── UNIFIED INPUT BAR (xl+ only) ── */}
+      <div className="hidden xl:block">
       <div className="mt-1">
         <div
           className={`
@@ -1064,6 +1391,7 @@ function Budget() {
           </p>
         )}
       </div>
+      </div>{/* end hidden xl:block */}
 
       {/* ── SECTION HEADING ── */}
       <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#a0a0a0] mt-5 mb-2">
@@ -1258,6 +1586,28 @@ function Budget() {
             </p>
           </div>
         )}
+
+      {/* Budget form modal (mobile/tablet) */}
+      <BudgetFormModal
+        open={showModal}
+        onClose={resetForm}
+        editId={editId}
+        limit={limit}
+        setLimit={setLimit}
+        category={category}
+        setCategory={setCategory}
+        period={period}
+        setPeriod={setPeriod}
+        fieldErrors={fieldErrors}
+        setFieldErrors={setFieldErrors}
+        submitting={submitting}
+        categories={categories}
+        emojiByCategory={emojiByCategory}
+        periodLabel={periodLabel}
+        onSubmit={handleSubmit}
+        onCancel={resetForm}
+        onAddCategory={handleAddCategorySimple}
+      />
 
       {/* Mobile-only budget detail modal */}
       <BudgetDetailModal
