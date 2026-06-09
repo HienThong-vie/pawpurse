@@ -28,8 +28,16 @@ export async function apiFetch(
     throw new Error(err?.message ?? "Network error");
   }
   if (!response.ok) {
-    console.error(`API error: ${url} returned ${response.status}`);
-    throw new Error(`Request failed (${response.status})`);
+    let detail = "";
+    try {
+      const body = await response.clone().json();
+      detail = typeof body?.detail === "string" ? body.detail : JSON.stringify(body?.detail ?? "");
+    } catch {
+      /* non-JSON body */
+    }
+    const msg = `Request failed (${response.status})${detail ? `: ${detail}` : ""}`;
+    console.error(`API error: ${url}`, msg);
+    throw new Error(msg);
   }
   return response;
 }
