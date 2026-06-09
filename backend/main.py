@@ -6,6 +6,7 @@ from core.database import (
     engine,
 )
 from routers import transactions,budgets,categories,goals,settings,export,currency,notifications,delete_account,mascot,advisor
+import models.chat_session  # noqa: F401 — ensures ChatSession is registered before create_all
 from core.auth import fetch_jwks
 from core.limiter import limiter
 from slowapi.errors import RateLimitExceeded

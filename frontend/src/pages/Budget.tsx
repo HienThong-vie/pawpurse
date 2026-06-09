@@ -709,13 +709,6 @@ function Budget() {
 
   return (
     <div className="font-[Inter] overflow-x-clip">
-      {/* Page subtitle */}
-      <header className="mb-6 lg:mb-8">
-        <p className="text-sm text-gray-500 dark:text-[#a0a0a0]">
-          {t("budget.subtitle")}
-        </p>
-      </header>
-
       {error && (
         <ErrorBanner message={error} onDismiss={() => setError(null)} />
       )}

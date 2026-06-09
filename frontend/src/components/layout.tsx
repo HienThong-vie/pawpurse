@@ -29,6 +29,12 @@ const SIDEBAR_ROUTES: Record<string, string> = {
   "/companion": "sidebar.companion",
 };
 
+const SIDEBAR_SUBTITLES: Record<string, string> = {
+  "/transactions": "transactions.subtitle",
+  "/budget": "budget.subtitle",
+  "/goals": "goals.subtitle",
+};
+
 // Routes that render their own mobile/tablet top bar (including the burger
 // trigger) — Layout must NOT render the fallback mobile header for these, or
 // the page will have a duplicated header row on small screens.
@@ -46,6 +52,7 @@ function Layout() {
   const [notifOpen, setNotifOpen] = useState(false);
 
   const sidebarKey = SIDEBAR_ROUTES[location.pathname];
+  const subtitleKey = SIDEBAR_SUBTITLES[location.pathname] ?? null;
   const showSidebar = Boolean(sidebarKey);
   const mascotVisible = !MASCOT_HIDDEN_ROUTES.includes(location.pathname);
   const hasOwnMobileHeader = ROUTES_WITH_OWN_MOBILE_HEADER.includes(
@@ -202,9 +209,19 @@ function Layout() {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <h2 className="text-[15px] font-semibold text-gray-900 dark:text-white tracking-tight">
-              {t(sidebarKey)}
-            </h2>
+            <div className="flex items-center gap-0 min-w-0 overflow-hidden">
+              <h2 className="text-[15px] font-semibold text-gray-900 dark:text-white tracking-tight shrink-0">
+                {t(sidebarKey)}
+              </h2>
+              {subtitleKey && (
+                <>
+                  <span className="mx-1.5 text-gray-400 dark:text-[#555] shrink-0 select-none">·</span>
+                  <p className="text-[13px] text-gray-500 dark:text-[#a0a0a0] truncate">
+                    {t(subtitleKey)}
+                  </p>
+                </>
+              )}
+            </div>
             <div className="ml-auto flex items-center">
               <button
                 type="button"

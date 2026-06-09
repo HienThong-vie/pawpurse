@@ -10,6 +10,7 @@ from core.auth import get_current_user
 from core.database import get_db
 from core.groq_client import get_groq_client
 from models.mascot import Mascot
+from models.chat_session import ChatSession
 from models.transaction import Transaction
 from models.budget import Budget
 from models.goal import Goal
@@ -18,6 +19,9 @@ from schemas.mascot import (
     AdvisorUsageResponse,
     AdvisorChatRequest,
     AdvisorChatResponse,
+    ChatSessionResponse,
+    CreateChatRequest,
+    UpdateChatRequest,
 )
 
 
@@ -380,6 +384,77 @@ def _execute_tool(
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────
+
+# ── Chat session CRUD ─────────────────────────────────────────────────────
+
+@router.get("/chats", response_model=List[ChatSessionResponse])
+def list_chats(
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return (
+        db.query(ChatSession)
+        .filter(ChatSession.user_id == user_id)
+        .order_by(ChatSession.created_at.desc())
+        .all()
+    )
+
+
+@router.post("/chats", response_model=ChatSessionResponse, status_code=201)
+def create_chat(
+    data: CreateChatRequest,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    chat = ChatSession(user_id=user_id, title=data.title, messages=[])
+    db.add(chat)
+    db.commit()
+    db.refresh(chat)
+    return chat
+
+
+@router.put("/chats/{chat_id}", response_model=ChatSessionResponse)
+def update_chat(
+    chat_id: str,
+    data: UpdateChatRequest,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    chat = (
+        db.query(ChatSession)
+        .filter(ChatSession.id == chat_id, ChatSession.user_id == user_id)
+        .first()
+    )
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    if data.title is not None:
+        chat.title = data.title
+    if data.pinned is not None:
+        chat.pinned = data.pinned
+    if data.messages is not None:
+        chat.messages = [m.model_dump(mode="json") for m in data.messages]
+    chat.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(chat)
+    return chat
+
+
+@router.delete("/chats/{chat_id}", status_code=204)
+def delete_chat(
+    chat_id: str,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    chat = (
+        db.query(ChatSession)
+        .filter(ChatSession.id == chat_id, ChatSession.user_id == user_id)
+        .first()
+    )
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    db.delete(chat)
+    db.commit()
+
 
 @router.get("/usage", response_model=AdvisorUsageResponse)
 def get_usage(

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Sparkles,
   Plus,
@@ -28,15 +28,15 @@ type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
-  timestamp: Date;
+  timestamp: string; // ISO string — kept as string for easy JSON round-trip
 };
 
 type Chat = {
   id: string;
   title: string;
   messages: Message[];
-  createdAt: Date;
-  pinned?: boolean;
+  created_at: string;
+  pinned: boolean;
 };
 
 type Usage = {
@@ -188,35 +188,9 @@ function Advisor() {
     },
   ];
 
-  const storageKey = user?.id ? `advisor_chats_${user.id}` : null;
-
-  const [chats, setChats] = useState<Chat[]>(() => {
-    if (!storageKey) return [];
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw) as Chat[];
-      return parsed.map((c) => ({
-        ...c,
-        createdAt: new Date(c.createdAt),
-        messages: c.messages.map((m) => ({
-          ...m,
-          timestamp: new Date(m.timestamp),
-        })),
-      }));
-    } catch {
-      return [];
-    }
-  });
-
-  const [activeChatId, setActiveChatId] = useState<string | null>(() => {
-    if (!user?.id) return null;
-    try {
-      return localStorage.getItem(`advisor_active_chat_${user.id}`) ?? null;
-    } catch {
-      return null;
-    }
-  });
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [chatsLoading, setChatsLoading] = useState(true);
 
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
@@ -234,17 +208,109 @@ function Advisor() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const emptyInputRef = useRef<HTMLInputElement>(null);
 
-  // Persist chats
-  useEffect(() => {
-    if (!storageKey) return;
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(chats));
-    } catch {
-      /* ignore quota errors */
-    }
-  }, [chats, storageKey]);
+  // Migrate localStorage chats to backend (one-time, for existing users)
+  const migrateLocalStorage = useCallback(
+    async (userId: string, serverChats: Chat[]) => {
+      if (serverChats.length > 0) return; // already have server data
+      const lsKey = `advisor_chats_${userId}`;
+      try {
+        const raw = localStorage.getItem(lsKey);
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as Array<{
+          id: string;
+          title: string;
+          messages: Array<{ id: string; role: string; content: string; timestamp: string | Date }>;
+          createdAt: string | Date;
+          pinned?: boolean;
+        }>;
+        if (!Array.isArray(parsed) || parsed.length === 0) return;
 
-  // Persist active chat id
+        // Upload each chat to the backend
+        for (const c of parsed.slice(0, 50)) {
+          try {
+            const msgs = (c.messages ?? []).map((m) => ({
+              id: m.id ?? uid(),
+              role: m.role,
+              content: m.content,
+              timestamp:
+                typeof m.timestamp === "string"
+                  ? m.timestamp
+                  : new Date(m.timestamp).toISOString(),
+            }));
+            const r = await apiFetch(`${API_BASE}/advisor/chats`, {
+              method: "POST",
+              body: JSON.stringify({ title: c.title || "Imported chat" }),
+            });
+            const created: Chat = await r.json();
+            if (msgs.length > 0) {
+              await apiFetch(`${API_BASE}/advisor/chats/${created.id}`, {
+                method: "PUT",
+                body: JSON.stringify({ messages: msgs, pinned: c.pinned ?? false }),
+              });
+            }
+          } catch {
+            // Skip individual failures
+          }
+        }
+        // Remove migrated data
+        localStorage.removeItem(lsKey);
+        localStorage.removeItem(`advisor_active_chat_${userId}`);
+
+        // Reload chats from server after migration
+        const r2 = await apiFetch(`${API_BASE}/advisor/chats`);
+        const migrated: Chat[] = await r2.json();
+        setChats(migrated);
+      } catch {
+        // Migration is best-effort; ignore errors
+      }
+    },
+    [],
+  );
+
+  // Load chats from backend on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const session = (await supabase.auth.getSession()).data.session;
+        if (!session || cancelled) return;
+
+        const [chatsRes, usageRes] = await Promise.all([
+          apiFetch(`${API_BASE}/advisor/chats`),
+          apiFetch(`${API_BASE}/advisor/usage`),
+        ]);
+        const serverChats: Chat[] = await chatsRes.json();
+        const usageData: Usage = await usageRes.json();
+
+        if (cancelled) return;
+
+        setChats(serverChats);
+        setUsage(usageData);
+
+        // Restore last active chat
+        const savedActiveId = user?.id
+          ? localStorage.getItem(`advisor_active_chat_${user.id}`)
+          : null;
+        if (savedActiveId && serverChats.some((c) => c.id === savedActiveId)) {
+          setActiveChatId(savedActiveId);
+        }
+
+        // One-time migration from localStorage
+        if (user?.id) {
+          await migrateLocalStorage(user.id, serverChats);
+        }
+      } catch {
+        // Silent — UI remains functional with empty chat list
+      } finally {
+        if (!cancelled) setChatsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist active chat id locally (just the ID, not full content)
   useEffect(() => {
     if (!user?.id) return;
     try {
@@ -257,25 +323,6 @@ function Advisor() {
       /* ignore */
     }
   }, [activeChatId, user?.id]);
-
-  // Fetch usage once on mount
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const session = (await supabase.auth.getSession()).data.session;
-        if (!session) return;
-        const r = await apiFetch(`${API_BASE}/advisor/usage`);
-        const data = await r.json();
-        if (!cancelled) setUsage(data);
-      } catch {
-        // Silent — UI will simply omit the counter
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id]);
 
   // Open warning / limit popups based on usage
   useEffect(() => {
@@ -290,7 +337,7 @@ function Advisor() {
           sessionStorage.setItem(key, "1");
         }
       } catch {
-        /* sessionStorage unavailable — skip the once-per-session guard */
+        /* sessionStorage unavailable */
       }
     }
   }, [usage, user?.id]);
@@ -309,17 +356,20 @@ function Advisor() {
     ? new Date(usage.resets_at).toLocaleDateString()
     : "";
 
-  function handleNewChat() {
-    const newChat: Chat = {
-      id: uid(),
-      title: "New Chat",
-      messages: [],
-      createdAt: new Date(),
-    };
-    setChats((prev) => [newChat, ...prev]);
-    setActiveChatId(newChat.id);
-    setSearchOpen(false);
-    setTimeout(() => emptyInputRef.current?.focus(), 250);
+  async function handleNewChat() {
+    try {
+      const r = await apiFetch(`${API_BASE}/advisor/chats`, {
+        method: "POST",
+        body: JSON.stringify({ title: "New Chat" }),
+      });
+      const chat: Chat = await r.json();
+      setChats((prev) => [chat, ...prev]);
+      setActiveChatId(chat.id);
+      setSearchOpen(false);
+      setTimeout(() => emptyInputRef.current?.focus(), 250);
+    } catch {
+      toast.error(t("advisor.errorGeneric"));
+    }
   }
 
   function openChatMenu(e: React.MouseEvent, chatId: string) {
@@ -330,10 +380,17 @@ function Advisor() {
   }
 
   function togglePin(chatId: string) {
+    const chat = chats.find((c) => c.id === chatId);
+    if (!chat) return;
+    const newPinned = !chat.pinned;
     setChats((prev) =>
-      prev.map((c) => (c.id === chatId ? { ...c, pinned: !c.pinned } : c)),
+      prev.map((c) => (c.id === chatId ? { ...c, pinned: newPinned } : c)),
     );
     setMenuChatId(null);
+    apiFetch(`${API_BASE}/advisor/chats/${chatId}`, {
+      method: "PUT",
+      body: JSON.stringify({ pinned: newPinned }),
+    }).catch(() => {});
   }
 
   function startRename(chat: Chat) {
@@ -355,6 +412,10 @@ function Advisor() {
       setChats((prev) =>
         prev.map((c) => (c.id === id ? { ...c, title: next } : c)),
       );
+      apiFetch(`${API_BASE}/advisor/chats/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ title: next }),
+      }).catch(() => {});
     }
     setRenamingId(null);
     setRenameValue("");
@@ -375,6 +436,13 @@ function Advisor() {
       danger: true,
     });
     if (!ok) return;
+    try {
+      await apiFetch(`${API_BASE}/advisor/chats/${chat.id}`, {
+        method: "DELETE",
+      });
+    } catch {
+      // Optimistically remove anyway
+    }
     setChats((prev) => prev.filter((c) => c.id !== chat.id));
     if (activeChatId === chat.id) setActiveChatId(null);
   }
@@ -387,37 +455,51 @@ function Advisor() {
 
     let chatId = activeChatId;
     let messageHistory: Message[] = [];
+
     if (!chatId) {
-      const newChat: Chat = {
-        id: uid(),
-        title: content.slice(0, 40),
-        messages: [],
-        createdAt: new Date(),
-      };
-      setChats((prev) => [newChat, ...prev]);
-      setActiveChatId(newChat.id);
-      chatId = newChat.id;
+      // Create a new chat on the backend first
+      try {
+        const r = await apiFetch(`${API_BASE}/advisor/chats`, {
+          method: "POST",
+          body: JSON.stringify({ title: content.slice(0, 40) }),
+        });
+        const newChat: Chat = await r.json();
+        setChats((prev) => [newChat, ...prev]);
+        setActiveChatId(newChat.id);
+        chatId = newChat.id;
+      } catch {
+        toast.error(t("advisor.errorGeneric"));
+        return;
+      }
     } else {
       messageHistory = chats.find((c) => c.id === chatId)?.messages ?? [];
+      // Auto-title from first message if still "New Chat"
+      const existingChat = chats.find((c) => c.id === chatId);
+      if (existingChat && existingChat.title === "New Chat" && messageHistory.length === 0) {
+        const autoTitle = content.slice(0, 40);
+        setChats((prev) =>
+          prev.map((c) => (c.id === chatId ? { ...c, title: autoTitle } : c)),
+        );
+        apiFetch(`${API_BASE}/advisor/chats/${chatId}`, {
+          method: "PUT",
+          body: JSON.stringify({ title: autoTitle }),
+        }).catch(() => {});
+      }
     }
 
     const userMsg: Message = {
       id: uid(),
       role: "user",
       content,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     };
 
     setChats((prev) =>
-      prev.map((c) => {
-        if (c.id !== chatId) return c;
-        const isFirst = c.messages.length === 0;
-        return {
-          ...c,
-          title: isFirst ? content.slice(0, 40) : c.title,
-          messages: [...c.messages, userMsg],
-        };
-      }),
+      prev.map((c) =>
+        c.id === chatId
+          ? { ...c, messages: [...c.messages, userMsg] }
+          : c,
+      ),
     );
 
     setThinking(true);
@@ -439,15 +521,25 @@ function Advisor() {
         id: uid(),
         role: "assistant",
         content: data.message || "",
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
       };
+
+      const updatedMessages = [...messageHistory, userMsg, assistantMsg];
+
       setChats((prev) =>
         prev.map((c) =>
           c.id === chatId
-            ? { ...c, messages: [...c.messages, assistantMsg] }
+            ? { ...c, messages: updatedMessages }
             : c,
         ),
       );
+
+      // Sync updated messages to backend
+      apiFetch(`${API_BASE}/advisor/chats/${chatId}`, {
+        method: "PUT",
+        body: JSON.stringify({ messages: updatedMessages }),
+      }).catch(() => {});
+
       setUsage({
         uses_this_week: data.uses_this_week,
         limit: data.limit,
@@ -456,7 +548,6 @@ function Advisor() {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err ?? "");
       if (message.includes("429")) {
-        // Refresh usage so the limit popup fires via the usage effect
         try {
           const u = await apiFetch(`${API_BASE}/advisor/usage`);
           setUsage(await u.json());
@@ -563,7 +654,11 @@ function Advisor() {
                 </button>
               </div>
               <div className="max-h-60 overflow-y-auto thin-scrollbar">
-                {filteredChats.length === 0 ? (
+                {chatsLoading ? (
+                  <p className="px-4 py-6 text-sm text-center text-gray-400 dark:text-[#666]">
+                    Loading…
+                  </p>
+                ) : filteredChats.length === 0 ? (
                   <p className="px-4 py-6 text-sm text-center text-gray-400 dark:text-[#666]">
                     {t("advisor.noChatsFound")}
                   </p>

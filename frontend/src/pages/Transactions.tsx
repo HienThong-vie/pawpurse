@@ -1155,13 +1155,6 @@ function Transactions() {
 
   return (
     <div className="font-[Inter]">
-      {/* Page subtitle */}
-      <header className="mb-6 lg:mb-8">
-        <p className="text-sm text-gray-500 dark:text-[#a0a0a0]">
-          {t("transactions.subtitle")}
-        </p>
-      </header>
-
       {error && (
         <ErrorBanner message={error} onDismiss={() => setError(null)} />
       )}

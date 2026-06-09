@@ -66,3 +66,33 @@ class AdvisorChatResponse(BaseModel):
     uses_this_week: int
     limit: int
     tool_results: Optional[List[Dict[str, Any]]] = None
+
+
+# ── Chat session schemas ──────────────────────────────────────────────────
+
+class ChatMessageSchema(BaseModel):
+    id: str
+    role: str
+    content: str
+    timestamp: datetime
+
+
+class ChatSessionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    title: str
+    messages: List[Any]
+    pinned: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class CreateChatRequest(BaseModel):
+    title: str = "New Chat"
+
+
+class UpdateChatRequest(BaseModel):
+    title: Optional[str] = None
+    pinned: Optional[bool] = None
+    messages: Optional[List[ChatMessageSchema]] = None
