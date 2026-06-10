@@ -339,7 +339,7 @@ type BudgetFormModalProps = {
   periodLabel: Record<string, string>;
   onSubmit: () => void;
   onCancel: () => void;
-  onAddCategory: (name: string) => Promise<void>;
+  onAddCategory: (name: string, emoji: string) => Promise<void>;
 };
 
 function BudgetFormModal({
@@ -363,11 +363,14 @@ function BudgetFormModal({
   onAddCategory,
 }: BudgetFormModalProps) {
   const { t } = useTranslation();
+  const { theme } = useTheme();
   const [rendered, setRendered] = useState(false);
   const [visible, setVisible] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const [addingCat, setAddingCat] = useState(false);
   const [newCatName, setNewCatName] = useState("");
+  const [newCatEmoji, setNewCatEmoji] = useState("💼");
+  const [emojiPickingForNew, setEmojiPickingForNew] = useState(false);
   const [submittingCat, setSubmittingCat] = useState(false);
 
   useEffect(() => {
@@ -398,9 +401,11 @@ function BudgetFormModal({
     if (!newCatName.trim()) return;
     setSubmittingCat(true);
     try {
-      await onAddCategory(newCatName.trim());
+      await onAddCategory(newCatName.trim(), newCatEmoji);
       setCategory(newCatName.trim());
       setNewCatName("");
+      setNewCatEmoji("💼");
+      setEmojiPickingForNew(false);
       setAddingCat(false);
     } finally {
       setSubmittingCat(false);
@@ -509,44 +514,74 @@ function BudgetFormModal({
                 {t("transactions.addNewCategory")}
               </button>
             ) : (
-              <div className="mt-2 flex gap-1.5">
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder={t("transactions.categoryNamePlaceholder")}
-                  value={newCatName}
-                  onChange={(e) => setNewCatName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleAddCat();
-                    if (e.key === "Escape") {
+              <div className="mt-2">
+                <div className="flex gap-1.5 items-center">
+                  <button
+                    type="button"
+                    onClick={() => setEmojiPickingForNew((p) => !p)}
+                    className="w-7 h-7 shrink-0 rounded-md bg-gray-100 dark:bg-[var(--bg-muted)] hover:bg-gray-200 dark:hover:bg-[var(--bg-hover)] flex items-center justify-center text-base leading-none select-none"
+                    title={t("transactions.pickEmoji")}
+                  >
+                    {newCatEmoji}
+                  </button>
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder={t("transactions.categoryNamePlaceholder")}
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleAddCat();
+                      if (e.key === "Escape") {
+                        setAddingCat(false);
+                        setNewCatName("");
+                        setNewCatEmoji("💼");
+                        setEmojiPickingForNew(false);
+                      }
+                    }}
+                    className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-[var(--bd)] bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a]"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCat}
+                    disabled={submittingCat || !newCatName.trim()}
+                    className="px-2.5 py-1.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-xs font-semibold disabled:opacity-50 hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors"
+                  >
+                    {submittingCat ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      t("common.add")
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
                       setAddingCat(false);
                       setNewCatName("");
-                    }
-                  }}
-                  className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-[var(--bd)] bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#555] outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a]"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddCat}
-                  disabled={submittingCat || !newCatName.trim()}
-                  className="px-2.5 py-1.5 rounded-lg bg-emerald-500 dark:bg-[#e8643a] text-white text-xs font-semibold disabled:opacity-50 hover:bg-emerald-600 dark:hover:bg-[#d2552d] transition-colors"
-                >
-                  {submittingCat ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    t("common.add")
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAddingCat(false);
-                    setNewCatName("");
-                  }}
-                  className="px-2 py-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                      setNewCatEmoji("💼");
+                      setEmojiPickingForNew(false);
+                    }}
+                    className="px-2 py-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {emojiPickingForNew && (
+                  <div className="mt-1.5">
+                    <EmojiPicker
+                      onEmojiClick={(e) => {
+                        setNewCatEmoji(e.emoji);
+                        setEmojiPickingForNew(false);
+                      }}
+                      theme={theme === "dark" ? Theme.DARK : Theme.LIGHT}
+                      width="100%"
+                      height={300}
+                      searchDisabled
+                      skinTonesDisabled
+                      previewConfig={{ showPreview: false }}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -699,11 +734,11 @@ function Budget() {
     }
   }, [user?.id]);
 
-  async function handleAddCategorySimple(name: string): Promise<void> {
+  async function handleAddCategorySimple(name: string, emoji: string): Promise<void> {
     await apiFetch(`${API_BASE}/categories/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: user?.id, name, emoji: "💼" }),
+      body: JSON.stringify({ user_id: user?.id, name, emoji }),
     });
     await fetchCategories();
   }

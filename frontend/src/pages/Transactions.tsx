@@ -432,7 +432,7 @@ function TransactionForm({
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-[var(--bd)] bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a] transition-colors dark:[color-scheme:dark]"
+          className="w-full min-w-0 px-3.5 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-[var(--bd)] bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a] transition-colors dark:[color-scheme:dark]"
         />
       </div>
 
@@ -1440,10 +1440,10 @@ function Transactions() {
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className="
-              w-full  shrink-0
+              w-full min-w-0 shrink-0
               sm:w-36 sm:max-w-none sm:mx-0
               px-3 py-2.5
-              text-sm text center bg-transparent border-none outline-none text-gray-900 dark:text-white dark:[color-scheme:dark]"
+              text-sm bg-transparent border-none outline-none text-gray-900 dark:text-white dark:[color-scheme:dark]"
             />
 
             <Divider />
