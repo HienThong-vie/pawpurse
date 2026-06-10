@@ -197,15 +197,17 @@ function GoalFormModal({
               {t("goals.deadlineLabel")}{" "}
               <span className="font-normal">(optional)</span>
             </label>
-            <input
-              type="date"
-              value={deadline}
-              onChange={(e) => {
-                setDeadline(e.target.value);
-                setFieldErrors((p) => ({ ...p, deadline: undefined }));
-              }}
-              className="w-full min-w-0 px-3.5 py-2.5 text-sm rounded-lg border border-gray-300 dark:border-[var(--bd)] bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a] dark:[color-scheme:dark]"
-            />
+            <div className="overflow-hidden rounded-lg border border-gray-300 dark:border-[var(--bd)] focus-within:ring-2 focus-within:ring-emerald-500/30 dark:focus-within:ring-[#e8643a]/30 focus-within:border-emerald-500 dark:focus-within:border-[#e8643a] transition-colors">
+              <input
+                type="date"
+                value={deadline}
+                onChange={(e) => {
+                  setDeadline(e.target.value);
+                  setFieldErrors((p) => ({ ...p, deadline: undefined }));
+                }}
+                className="block w-full px-3.5 py-2.5 text-sm bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white outline-none dark:[color-scheme:dark]"
+              />
+            </div>
             {fieldErrors.deadline && (
               <p className="mt-1 text-xs text-red-500">{fieldErrors.deadline}</p>
             )}
@@ -590,7 +592,7 @@ function Goals() {
               type="date"
               value={deadline}
               onChange={(e) => setDeadline(e.target.value)}
-              className="w-full min-w-0 sm:w-36 shrink-0 px-3 py-2.5 text-sm bg-transparent border-none outline-none text-gray-900 dark:text-white dark:[color-scheme:dark]"
+              className="w-full min-w-0 max-w-full sm:w-36 shrink-0 px-3 py-2.5 text-sm bg-transparent border-none outline-none text-gray-900 dark:text-white dark:[color-scheme:dark]"
             />
             <Divider />
             {editId !== null && (

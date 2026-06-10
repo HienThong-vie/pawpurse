@@ -428,12 +428,14 @@ function TransactionForm({
         <label className="block text-xs font-semibold text-gray-500 dark:text-[#a0a0a0] mb-1.5 uppercase tracking-wide">
           {t("transactions.dateLabel")}
         </label>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="w-full min-w-0 px-3.5 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-[var(--bd)] bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/30 dark:focus:ring-[#e8643a]/30 focus:border-emerald-500 dark:focus:border-[#e8643a] transition-colors dark:[color-scheme:dark]"
-        />
+        <div className="overflow-hidden rounded-xl border border-gray-300 dark:border-[var(--bd)] focus-within:ring-2 focus-within:ring-emerald-500/30 dark:focus-within:ring-[#e8643a]/30 focus-within:border-emerald-500 dark:focus-within:border-[#e8643a] transition-colors">
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="block w-full px-3.5 py-2.5 text-sm bg-white dark:bg-[var(--bg-page)] text-gray-900 dark:text-white outline-none dark:[color-scheme:dark]"
+          />
+        </div>
       </div>
 
       {/* Note */}
@@ -1440,8 +1442,8 @@ function Transactions() {
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className="
-              w-full min-w-0 shrink-0
-              sm:w-36 sm:max-w-none sm:mx-0
+              w-full min-w-0 max-w-full
+              sm:w-40 sm:max-w-none sm:mx-0
               px-3 py-2.5
               text-sm bg-transparent border-none outline-none text-gray-900 dark:text-white dark:[color-scheme:dark]"
             />
@@ -1866,7 +1868,9 @@ function Transactions() {
                           {tx.category}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-[#a0a0a0] flex items-center gap-1 mt-0.5">
-                          <span className="truncate">{formatDate(tx.date)}</span>
+                          <span className="truncate">
+                            {formatDate(tx.date)}
+                          </span>
                           {tx.is_recurring && (
                             <RefreshCw className="w-3 h-3 opacity-70 shrink-0" />
                           )}
