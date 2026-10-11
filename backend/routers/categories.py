@@ -12,9 +12,9 @@ router = APIRouter (
 )
 
 @router.post("/",response_model=CategoryResponse)
-def create_category(data: CategoryCreate, db: Session = Depends(get_db)):
+def create_category(data: CategoryCreate, user_id: str = Depends(get_current_user), db: Session = Depends(get_db)):
     name = data.name.lower()
-    existed_category = db.query(Category).filter(Category.name == name, Category.user_id == data.user_id).first()
+    existed_category = db.query(Category).filter(Category.name == name, Category.user_id == user_id).first()
     if existed_category:
         # If client supplied a non-default emoji, update it on the existing row.
         if data.emoji and data.emoji != "💼" and existed_category.emoji != data.emoji:
@@ -24,7 +24,7 @@ def create_category(data: CategoryCreate, db: Session = Depends(get_db)):
         return existed_category
     else:
         new_category = Category(
-            user_id=data.user_id,
+            user_id=user_id,
             name=name,
             emoji=data.emoji or "💼",
         )

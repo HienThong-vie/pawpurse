@@ -17,6 +17,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationContext";
 import { useTranslation } from "react-i18next";
 import ErrorBanner from "../components/ErrorBanner";
+import { MASCOT_UPDATED_EVENT } from "../lib/shopBeds";
 import {
   PieChart,
   Pie,
@@ -111,6 +112,18 @@ function Dashboard() {
       rolloverChecked.current = true;
       if (!user?.id || !Array.isArray(fetchedBudgets)) return;
 
+      // Coins for budget savings are computed server-side (idempotent per
+      // budget period). Fire-and-forget so a mascot failure can't block the page.
+      apiFetch(`${API_BASE}/mascot/rewards/budgets`, { method: "POST" })
+        .then((r) => r.json())
+        .then((res: { coins_awarded: number }) => {
+          if (res.coins_awarded > 0)
+            window.dispatchEvent(new CustomEvent(MASCOT_UPDATED_EVENT));
+        })
+        .catch((err) => {
+          console.error("Failed to claim budget rewards", err);
+        });
+
       const notifPrefs = user?.user_metadata?.notification_prefs ?? {};
       const budgetDefaults = user?.user_metadata?.budget_defaults ?? {};
       const budgetSavedEnabled =
@@ -179,20 +192,6 @@ function Dashboard() {
               }),
             });
             createdAny = true;
-
-            // Award coins to the mascot — scales with how close to the limit
-            // the user got (full budget = 10 coins). Fire-and-forget so a
-            // mascot failure can't block notifications.
-            const limit = Number(prior.limit) || 0;
-            const coins = limit > 0 ? Math.floor((saved / limit) * 10) : 0;
-            if (coins > 0) {
-              apiFetch(`${API_BASE}/mascot/coins`, {
-                method: "PATCH",
-                body: JSON.stringify({ coins }),
-              }).catch((err) => {
-                console.error("Failed to award mascot coins", err);
-              });
-            }
           } catch (err) {
             console.error("Failed to create budget_saved notification", err);
           }

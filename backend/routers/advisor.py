@@ -30,6 +30,10 @@ router = APIRouter(prefix="/advisor", tags=["advisor"])
 WEEKLY_LIMIT = 10
 WEEK_LENGTH = timedelta(days=7)
 GROQ_MODEL = "llama-3.3-70b-versatile"
+# Bound the prompt size per request — the Groq free tier has a shared daily
+# token cap, so one oversized history must not be able to exhaust it.
+MAX_HISTORY_MESSAGES = 20
+MAX_MESSAGE_CHARS = 4000
 
 # Matches a complete leaked function-call tag in text content.
 # Compiled once at module level; used in chat() to recover silently-dropped actions.
@@ -177,7 +181,8 @@ def _groq_http_exc(e: Exception, context: str = "") -> HTTPException:
             detail="The AI service is temporarily busy — please try again in a moment.",
         )
     label = f"Groq {context} error" if context else "Groq error"
-    return HTTPException(status_code=502, detail=f"{label}: {e}")
+    print(f"{label}: {e}")
+    return HTTPException(status_code=502, detail="The AI service returned an error — please try again.")
 
 
 def _strip_formatting(text: str) -> str:
@@ -282,6 +287,10 @@ def _execute_tool(
         amount = float(args.get("amount", 0))
         if amount <= 0:
             return {"error": "amount must be positive"}
+        if args.get("type") not in ("income", "expense"):
+            return {"error": "type must be 'income' or 'expense'"}
+        if not args.get("category"):
+            return {"error": "category is required"}
         tx_date = None
         if args.get("date"):
             try:
@@ -311,6 +320,10 @@ def _execute_tool(
         limit = float(args.get("limit", 0))
         if limit <= 0:
             return {"error": "limit must be positive"}
+        if args.get("period") not in ("daily", "weekly", "monthly"):
+            return {"error": "period must be daily, weekly or monthly"}
+        if not args.get("category"):
+            return {"error": "category is required"}
         existing = (
             db.query(Budget)
             .filter(Budget.user_id == user_id, Budget.category == args["category"])
@@ -495,10 +508,9 @@ def chat(
         base_currency = context["base_currency"]
 
         messages: List[dict] = [{"role": "system", "content": system_prompt}]
-        for m in data.messages:
-            if m.role not in ("user", "assistant"):
-                continue
-            messages.append({"role": m.role, "content": m.content})
+        history = [m for m in data.messages if m.role in ("user", "assistant")]
+        for m in history[-MAX_HISTORY_MESSAGES:]:
+            messages.append({"role": m.role, "content": m.content[:MAX_MESSAGE_CHARS]})
 
         client = get_groq_client()
         try:
@@ -643,7 +655,7 @@ def chat(
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Unexpected error in AI advisor")

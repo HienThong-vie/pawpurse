@@ -738,7 +738,7 @@ function Budget() {
     await apiFetch(`${API_BASE}/categories/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: user?.id, name, emoji }),
+      body: JSON.stringify({ name, emoji }),
     });
     await fetchCategories();
   }
@@ -845,7 +845,6 @@ function Budget() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            user_id: user?.id,
             category,
             limit: lim,
             period,
@@ -933,7 +932,6 @@ function Budget() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user_id: user?.id,
           name: newCategoryName.trim(),
           emoji: newCategoryEmoji,
         }),

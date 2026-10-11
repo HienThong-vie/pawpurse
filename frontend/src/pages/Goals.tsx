@@ -340,7 +340,6 @@ function Goals() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            user_id: user?.id,
             name,
             target_amount: parseFloat(target_amount),
             current_amount: parseFloat(current_amount) || 0,
@@ -354,7 +353,6 @@ function Goals() {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            user_id: user?.id,
             name,
             target_amount: parseFloat(target_amount),
             current_amount: parseFloat(current_amount) || 0,

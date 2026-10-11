@@ -717,9 +717,7 @@ function Transactions() {
   const [note, setNote] = useState("");
   const [date, setDate] = useState("");
   const [is_recurring, setIsRecurring] = useState(false);
-  const [recurring_interval, setRecurringInterval] = useState(
-    t("budget.periodMonthly"),
-  );
+  const [recurring_interval, setRecurringInterval] = useState("monthly");
   const [baseCurrency, setBaseCurrency] = useState<string>("USD");
 
   // Inline bar dropdown state (xl+ only)
@@ -928,14 +926,13 @@ function Transactions() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            user_id: user?.id,
             amount: amt,
             type,
             category,
             note,
             date: `${effectiveDate}T${currentTime}`,
             is_recurring,
-            recurring_interval,
+            recurring_interval: is_recurring ? recurring_interval : null,
             currency: baseCurrency,
           }),
         });
@@ -945,14 +942,13 @@ function Transactions() {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            user_id: user?.id,
             amount: amt,
             type,
             category,
             note,
             date: `${effectiveDate}T${currentTime}`,
             is_recurring,
-            recurring_interval,
+            recurring_interval: is_recurring ? recurring_interval : null,
           }),
         });
         toast.success(t("transactions.toastUpdated"));
@@ -994,6 +990,7 @@ function Transactions() {
     setNote(transaction.note || "");
     setDate(transaction.date?.split("T")[0] || "");
     setIsRecurring(transaction.is_recurring || false);
+    setRecurringInterval(transaction.recurring_interval || "monthly");
     if (window.innerWidth < 1280) {
       setShowModal(true);
     } else {
@@ -1006,7 +1003,7 @@ function Transactions() {
       await apiFetch(`${API_BASE}/categories/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user?.id, name, emoji }),
+        body: JSON.stringify({ name, emoji }),
       });
       toast.success("Category added");
       await fetchCategories();

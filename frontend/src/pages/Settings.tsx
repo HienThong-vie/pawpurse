@@ -21,6 +21,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useToast } from "../context/ToastContext";
 import { useConfirm } from "../context/ConfirmContext";
+import { useNotifications } from "../context/NotificationContext";
 import { apiFetch, API_BASE } from "../lib/api";
 import { useTranslation } from "react-i18next";
 
@@ -379,7 +380,7 @@ function PreferencesSection() {
       await apiFetch(`${API_BASE}/settings/`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user?.id, base_currency: currency }),
+        body: JSON.stringify({ base_currency: currency }),
       });
       toast.success(t("settings.toastSettingsSaved"));
     } finally {
@@ -754,6 +755,7 @@ function DataPrivacySection() {
   const { t } = useTranslation();
   const toast = useToast();
   const { confirm } = useConfirm();
+  const { refresh: refreshNotifications } = useNotifications();
 
   async function handleClear(
     titleKey: string,
@@ -779,9 +781,10 @@ function DataPrivacySection() {
           await apiFetch(`${API_BASE}/notifications/clear-all`, {
             method: "DELETE",
           });
+          await refreshNotifications();
           toast.success(t("settings.toastNotificationsCleared"));
-        } catch {
-          toast.success(t("settings.toastClearComingSoon"));
+        } catch (err: any) {
+          toast.error(err?.message || t("settings.support.sendError"));
         }
       },
     },

@@ -1,42 +1,46 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from core.database import get_db
-from models.transaction import Transaction
 from datetime import datetime, timedelta, timezone
+from core.database import SessionLocal
+from models.transaction import Transaction
 
-def process_recurring_transactions(db: Session = Depends(get_db)):
-    recurring_trannsactions =  db.query(Transaction).filter(Transaction.is_recurring == True).all()
+INTERVALS = {
+    "daily": timedelta(days=1),
+    "weekly": timedelta(days=7),
+    "monthly": timedelta(days=30),
+}
 
-    for transaction in recurring_trannsactions:
-        last_triggered = transaction.last_triggered or transaction.date
-        # Normalize naive datetimes (legacy rows stored without tz) to UTC
-        if last_triggered is not None and last_triggered.tzinfo is None:
-            last_triggered = last_triggered.replace(tzinfo=timezone.utc)
 
-        if (transaction.recurring_interval == "daily"):
-            next_trigger = last_triggered + timedelta(days=1)
-        elif (transaction.recurring_interval == "weekly"):
-            next_trigger = last_triggered + timedelta(days=7)
-        elif (transaction.recurring_interval == "monthly"):
-            next_trigger = last_triggered + timedelta(days=30)
-        else:
-            continue
-
+def process_recurring_transactions():
+    """Clone due recurring transactions. Runs as a background task with its own
+    session so it never shares (or commits) the request's session state."""
+    db = SessionLocal()
+    try:
+        recurring_transactions = db.query(Transaction).filter(Transaction.is_recurring == True).all()  # noqa: E712
         today = datetime.now(timezone.utc)
-        if (today >= next_trigger):
-            new_transaction = Transaction (
-                user_id = transaction.user_id,
-                amount=transaction.amount,
-                type = transaction.type,
-                category  = transaction.category,
-                note = transaction.note,
-                date = datetime.now(timezone.utc),
-                is_recurring=False,
-                recurring_interval =None,
-                last_triggered=None,
-                currency = transaction.currency
-            )
-            db.add(new_transaction)
-            transaction.last_triggered = today
-            db.commit()
+        for transaction in recurring_transactions:
+            interval = INTERVALS.get(transaction.recurring_interval)
+            if interval is None:
+                continue
+            last_triggered = transaction.last_triggered or transaction.date
+            if last_triggered is None:
+                continue
+            # Normalize naive datetimes (legacy rows stored without tz) to UTC
+            if last_triggered.tzinfo is None:
+                last_triggered = last_triggered.replace(tzinfo=timezone.utc)
 
+            if today >= last_triggered + interval:
+                db.add(Transaction(
+                    user_id=transaction.user_id,
+                    amount=transaction.amount,
+                    type=transaction.type,
+                    category=transaction.category,
+                    note=transaction.note,
+                    date=today,
+                    is_recurring=False,
+                    recurring_interval=None,
+                    last_triggered=None,
+                    currency=transaction.currency,
+                ))
+                transaction.last_triggered = today
+        db.commit()
+    finally:
+        db.close()
