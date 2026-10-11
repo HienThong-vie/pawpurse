@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { apiFetch, API_BASE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { MASCOT_HIDDEN_ROUTES } from "../lib/routes";
 import { getBed, MASCOT_UPDATED_EVENT } from "../lib/shopBeds";
 
 type Mascot = {
@@ -11,9 +12,6 @@ type Mascot = {
   active_bed: string;
 };
 
-// Routes where the floating widget is hidden. Layout reads this to skip the
-// extra bottom padding it adds elsewhere so content can scroll clear of the mascot.
-export const MASCOT_HIDDEN_ROUTES = ["/advisor", "/companion"];
 
 function SleepingMascot() {
   const { user } = useAuth();

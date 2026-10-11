@@ -11,7 +11,7 @@ type Props = {
   onClose: () => void;
 };
 
-function formatRelative(iso: string, t: (k: string, opts?: any) => string) {
+function formatRelative(iso: string, t: (k: string, opts?: Record<string, unknown>) => string) {
   const then = new Date(iso).getTime();
   const now = Date.now();
   const diff = Math.max(0, now - then);

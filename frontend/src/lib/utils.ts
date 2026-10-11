@@ -27,3 +27,14 @@ export async function fetchBaseCurrency(): Promise<string> {
     return "USD";
   }
 }
+
+/** Best-effort human-readable message from an unknown thrown value
+ *  (Error, EmailJS `{ text }` response, or a plain string). */
+export function errorMessage(err: unknown): string {
+  if (typeof err === "string") return err;
+  if (err && typeof err === "object") {
+    if ("message" in err && typeof err.message === "string") return err.message;
+    if ("text" in err && typeof err.text === "string") return err.text;
+  }
+  return "";
+}

@@ -10,10 +10,11 @@ import {
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import { formatCurrency, fetchBaseCurrency } from "../lib/utils";
+import { formatCurrency, fetchBaseCurrency, errorMessage } from "../lib/utils";
 import { apiFetch, API_BASE } from "../lib/api";
+import { useModalTransition } from "../lib/useModalTransition";
+import type { Goal } from "../lib/types";
 import ErrorBanner from "../components/ErrorBanner";
 
 type GoalFieldErrors = {
@@ -74,20 +75,8 @@ function GoalFormModal({
   onCancel,
 }: GoalFormModalProps) {
   const { t } = useTranslation();
-  const [rendered, setRendered] = useState(false);
-  const [visible, setVisible] = useState(false);
+  const { rendered, visible } = useModalTransition(open);
   const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (open) {
-      setRendered(true);
-      requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)));
-    } else {
-      setVisible(false);
-      const timer = setTimeout(() => setRendered(false), 250);
-      return () => clearTimeout(timer);
-    }
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -252,9 +241,8 @@ function GoalFormModal({
 
 function Goals() {
   const { t } = useTranslation();
-  const { user } = useAuth();
   const toast = useToast();
-  const [goals, setGoals] = useState<any[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [editId, setEditId] = useState<number | null>(null);
   // Form fields
   const [name, setName] = useState("");
@@ -292,19 +280,19 @@ function Goals() {
       );
       const goalsData = await goalsResponse.json();
       setGoals(goalsData);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, []);
 
   useEffect(() => {
     initPage();
   }, [initPage]);
 
   // Converts a base-currency amount into the goal's storage currency for PUT.
-  async function resolveNewStored(goal: any, newBase: number): Promise<number> {
+  async function resolveNewStored(goal: Goal, newBase: number): Promise<number> {
     const goalCurrency = goal.currency || "USD";
     if (goalCurrency === baseCurrency) return newBase;
     const ratesRes = await apiFetch(
@@ -370,14 +358,14 @@ function Goals() {
       setDeadline("");
       setFieldErrors({});
       setShowModal(false);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setSubmitting(false);
     }
   }
 
-  function handleEdit(goal: any) {
+  function handleEdit(goal: Goal) {
     setEditId(goal.id);
     setName(goal.name);
     setCurrentAmount(String(goal.current_amount));
@@ -403,12 +391,12 @@ function Goals() {
     try {
       await apiFetch(`${API_BASE}/goals/${id}`, { method: "DELETE" });
       initPage();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     }
   }
 
-  async function handleAddProgress(goal: any) {
+  async function handleAddProgress(goal: Goal) {
     const added = parseFloat(progressInput[goal.id] || "0");
     if (!added || added <= 0) {
       toast.error("Enter an amount greater than zero");
@@ -432,14 +420,14 @@ function Goals() {
       }));
       initPage();
       setProgressInput((prev) => ({ ...prev, [goal.id]: "" }));
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update goal");
+    } catch (err) {
+      toast.error(errorMessage(err) || "Failed to update goal");
     } finally {
       setProgressSubmittingId(null);
     }
   }
 
-  async function handleQuickAdd(goal: any, pct: number) {
+  async function handleQuickAdd(goal: Goal, pct: number) {
     const delta = roundForCurrency(
       (goal.target_amount * pct) / 100,
       baseCurrency,
@@ -460,14 +448,14 @@ function Goals() {
         [goal.id]: goal.current_amount ?? 0,
       }));
       initPage();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update goal");
+    } catch (err) {
+      toast.error(errorMessage(err) || "Failed to update goal");
     } finally {
       setQuickAddSubmittingId(null);
     }
   }
 
-  async function handleUndoProgress(goal: any) {
+  async function handleUndoProgress(goal: Goal) {
     const prevBase = previousAmounts[goal.id];
     if (prevBase === undefined) return;
     setUndoSubmittingId(goal.id);
@@ -485,8 +473,8 @@ function Goals() {
         return next;
       });
       initPage();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setUndoSubmittingId(null);
     }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Outlet, useNavigate, NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -19,7 +19,8 @@ import { useNotifications } from "../context/NotificationContext";
 import supabase from "../lib/supabaseClient";
 import NotificationPanel from "./NotificationPanel";
 import RatingPopup from "./RatingPopup";
-import SleepingMascot, { MASCOT_HIDDEN_ROUTES } from "./SleepingMascot";
+import SleepingMascot from "./SleepingMascot";
+import { MASCOT_HIDDEN_ROUTES, ROUTES_WITH_OWN_MOBILE_HEADER } from "../lib/routes";
 
 const SIDEBAR_ROUTES: Record<string, string> = {
   "/dashboard": "sidebar.dashboard",
@@ -34,11 +35,6 @@ const SIDEBAR_SUBTITLES: Record<string, string> = {
   "/budget": "budget.subtitle",
   "/goals": "goals.subtitle",
 };
-
-// Routes that render their own mobile/tablet top bar (including the burger
-// trigger) — Layout must NOT render the fallback mobile header for these, or
-// the page will have a duplicated header row on small screens.
-export const ROUTES_WITH_OWN_MOBILE_HEADER = ["/advisor"];
 
 export type LayoutOutletContext = { openSidebar: () => void };
 
@@ -60,10 +56,12 @@ function Layout() {
   );
 
   const rawAvatarUrl = user?.user_metadata?.avatar_url as string | undefined;
-  const avatarUrl = useMemo(
-    () => (rawAvatarUrl ? `${rawAvatarUrl}?t=${Date.now()}` : null),
-    [rawAvatarUrl],
-  );
+  // Cache-bust with updated_at (bumped when the avatar is re-uploaded) rather
+  // than Date.now(), which would be impure during render.
+  const avatarVersion = user?.updated_at ?? "";
+  const avatarUrl = rawAvatarUrl
+    ? `${rawAvatarUrl}?t=${encodeURIComponent(avatarVersion)}`
+    : null;
   const avatarInitial =
     user?.user_metadata?.username?.[0]?.toUpperCase() ?? "U";
 

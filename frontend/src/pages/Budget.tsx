@@ -15,8 +15,10 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { useConfirm } from "../context/ConfirmContext";
 import { useTheme } from "../context/ThemeContext";
-import { formatCurrency, fetchBaseCurrency } from "../lib/utils";
+import { formatCurrency, fetchBaseCurrency, errorMessage } from "../lib/utils";
 import { apiFetch, API_BASE } from "../lib/api";
+import { useModalTransition } from "../lib/useModalTransition";
+import type { Budget as BudgetItem, Category, Transaction } from "../lib/types";
 import ErrorBanner from "../components/ErrorBanner";
 
 type BudgetFieldErrors = {
@@ -84,7 +86,7 @@ function useIsMobile(query = "(max-width: 1023px)") {
 
 type BudgetDetailModalProps = {
   open: boolean;
-  budget: any | null;
+  budget: BudgetItem | null;
   emoji: string;
   baseCurrency: string;
   statusLabel: string;
@@ -112,26 +114,12 @@ function BudgetDetailModal({
   onDelete,
 }: BudgetDetailModalProps) {
   const { t } = useTranslation();
-  const [rendered, setRendered] = useState(false);
-  const [visible, setVisible] = useState(false);
+  const { rendered, visible } = useModalTransition(open);
   const panelRef = useRef<HTMLDivElement>(null);
   // Hold onto the last non-null budget so closing animations still have data to render.
-  const lastBudgetRef = useRef<any | null>(budget);
-  if (budget) lastBudgetRef.current = budget;
-  const display = budget ?? lastBudgetRef.current;
-
-  useEffect(() => {
-    if (open) {
-      setRendered(true);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => setVisible(true));
-      });
-    } else {
-      setVisible(false);
-      const t = setTimeout(() => setRendered(false), 250);
-      return () => clearTimeout(t);
-    }
-  }, [open]);
+  const [lastBudget, setLastBudget] = useState<BudgetItem | null>(budget);
+  if (budget && budget !== lastBudget) setLastBudget(budget);
+  const display = budget ?? lastBudget;
 
   useEffect(() => {
     if (!open) return;
@@ -334,7 +322,7 @@ type BudgetFormModalProps = {
   fieldErrors: BudgetFieldErrors;
   setFieldErrors: Dispatch<SetStateAction<BudgetFieldErrors>>;
   submitting: boolean;
-  categories: any[];
+  categories: Category[];
   emojiByCategory: Record<string, string>;
   periodLabel: Record<string, string>;
   onSubmit: () => void;
@@ -673,10 +661,10 @@ function Budget() {
     monthly: t("budget.periodMonthly"),
   };
   const isMobile = useIsMobile();
-  const [selectedBudget, setSelectedBudget] = useState<any | null>(null);
+  const [selectedBudget, setSelectedBudget] = useState<BudgetItem | null>(null);
   const [editId, setEditId] = useState<number | null>(null);
-  const [budgets, setBudgets] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [budgets, setBudgets] = useState<BudgetItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   // Form fields
   const [category, setCategory] = useState("");
   const [limit, setLimit] = useState("");
@@ -729,10 +717,10 @@ function Budget() {
       });
       const data = await response.json();
       setCategories(data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     }
-  }, [user?.id]);
+  }, []);
 
   async function handleAddCategorySimple(name: string, emoji: string): Promise<void> {
     await apiFetch(`${API_BASE}/categories/`, {
@@ -751,10 +739,10 @@ function Budget() {
       );
       const data = await response.json();
       setBudgets(data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     }
-  }, [user?.id, baseCurrency]);
+  }, [baseCurrency]);
 
   useEffect(() => {
     async function init() {
@@ -767,8 +755,8 @@ function Budget() {
         const budgetRes = await budgetResponse.json();
         fetchCategories();
         setBudgets(budgetRes);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        setError(errorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -873,8 +861,8 @@ function Budget() {
       }
       fetchBudgets();
       resetForm();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -886,12 +874,12 @@ function Budget() {
         method: "DELETE",
       });
       fetchBudgets();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     }
   }
 
-  async function handleEdit(budget: any) {
+  async function handleEdit(budget: BudgetItem) {
     setEditId(budget.id);
     setCategory(budget.category);
     setLimit(String(budget.limit));
@@ -943,8 +931,8 @@ function Budget() {
       setNewCategoryEmoji("💼");
       setShowAddCategory(false);
       setShowCategoryDropdown(false);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setSubmittingCategory(false);
     }
@@ -958,8 +946,8 @@ function Budget() {
         body: JSON.stringify({ emoji }),
       });
       await fetchCategories();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setEmojiEditingId(null);
     }
@@ -974,7 +962,7 @@ function Budget() {
     }
   }
 
-  async function handleDeleteCategory(category_id: any) {
+  async function handleDeleteCategory(category_id: number) {
     const cat = categories.find((c) => c.id === category_id);
     if (!cat) return;
 
@@ -982,11 +970,9 @@ function Budget() {
       const txRes = await apiFetch(
         `${API_BASE}/transactions/?base_currency=${baseCurrency}`,
       );
-      const txData = await txRes.json();
-      const relatedTx = txData.filter((t: any) => t.category === cat.name);
-      const relatedBudgets = budgets.filter(
-        (b: any) => b.category === cat.name,
-      );
+      const txData: Transaction[] = await txRes.json();
+      const relatedTx = txData.filter((t) => t.category === cat.name);
+      const relatedBudgets = budgets.filter((b) => b.category === cat.name);
 
       const txCount = relatedTx.length;
       const budgetCount = relatedBudgets.length;
@@ -1003,12 +989,12 @@ function Budget() {
         if (!proceed) return;
 
         await Promise.all([
-          ...relatedTx.map((t: any) =>
+          ...relatedTx.map((t) =>
             apiFetch(`${API_BASE}/transactions/${t.id}`, {
               method: "DELETE",
             }),
           ),
-          ...relatedBudgets.map((b: any) =>
+          ...relatedBudgets.map((b) =>
             apiFetch(`${API_BASE}/budgets/${b.id}`, {
               method: "DELETE",
             }),
@@ -1022,8 +1008,8 @@ function Budget() {
       toast.success(`Category "${cat.name}" deleted`);
       await fetchCategories();
       await fetchBudgets();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     }
   }
 

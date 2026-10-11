@@ -7,6 +7,7 @@ import { apiFetch, API_BASE } from "../lib/api";
 import { useToast } from "../context/ToastContext";
 import i18n from "../i18n/config";
 import { Check, Loader2, PawPrint } from "lucide-react";
+import { errorMessage } from "../lib/utils";
 
 const CURRENCIES = [
   { code: "USD", name: "US Dollar" },
@@ -114,8 +115,8 @@ function SetupWizard() {
         `Welcome! Your companion ${companionName.trim()} is ready.`,
       );
       navigate("/dashboard");
-    } catch (error: any) {
-      toast.error(error.message || "Something went wrong during setup.");
+    } catch (error) {
+      toast.error(errorMessage(error) || "Something went wrong during setup.");
       return;
     } finally {
       setSaving(false);

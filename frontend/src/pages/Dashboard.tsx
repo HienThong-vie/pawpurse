@@ -11,10 +11,11 @@ import {
   Check,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { formatCurrency, fetchBaseCurrency, formatDate } from "../lib/utils";
+import { formatCurrency, fetchBaseCurrency, formatDate, errorMessage } from "../lib/utils";
 import { apiFetch, API_BASE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { useNotifications } from "../context/NotificationContext";
+import { useNotifications, type NotificationItem } from "../context/NotificationContext";
+import type { Budget, Category, Goal, Transaction } from "../lib/types";
 import { useTranslation } from "react-i18next";
 import ErrorBanner from "../components/ErrorBanner";
 import { MASCOT_UPDATED_EVENT } from "../lib/shopBeds";
@@ -68,9 +69,9 @@ function Dashboard() {
     month: t("dashboard.periodMonthly"),
     all: t("dashboard.periodAllTime"),
   };
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [goals, setGoals] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [baseCurrency, setBaseCurrency] = useState("USD");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("week");
@@ -97,15 +98,15 @@ function Dashboard() {
         setCategories(await catsRes.json());
         const fetchedBudgets = await budgetsRes.json();
         await detectBudgetRollover(fetchedBudgets, currency);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        setError(errorMessage(err));
       } finally {
         setLoading(false);
       }
     }
 
     async function detectBudgetRollover(
-      fetchedBudgets: any[],
+      fetchedBudgets: Budget[],
       currency: string,
     ) {
       if (rolloverChecked.current) return;
@@ -135,7 +136,7 @@ function Dashboard() {
       if (!budgetSavedEnabled && !budgetWarningEnabled) return;
 
       // Fetch existing notifications once for both dedup checks.
-      let existingNotifs: any[] = [];
+      let existingNotifs: NotificationItem[] = [];
       try {
         const r = await apiFetch(`${API_BASE}/notifications/`);
         existingNotifs = await r.json();
@@ -168,7 +169,7 @@ function Dashboard() {
           if (saved <= 0) continue;
 
           const duplicate = existingNotifs.some(
-            (n: any) =>
+            (n) =>
               n.type === "budget_saved" &&
               n.data?.budget_category === b.category &&
               n.data?.period_start === prior.period_start,
@@ -210,7 +211,7 @@ function Dashboard() {
           if (spentPct < warningThreshold) continue;
 
           const duplicate = existingNotifs.some(
-            (n: any) =>
+            (n) =>
               n.type === "budget_warning" &&
               n.data?.budget_category === b.category &&
               n.data?.period_start === String(b.period_start),
@@ -388,8 +389,8 @@ function Dashboard() {
     [transactions],
   );
 
-  const tooltipFormatter = (value: any, name: any) => [
-    formatCurrency(value as number, baseCurrency),
+  const tooltipFormatter = (value: unknown, name: unknown) => [
+    formatCurrency(Number(value), baseCurrency),
     String(name).charAt(0).toUpperCase() + String(name).slice(1),
   ];
 

@@ -24,6 +24,7 @@ import { useConfirm } from "../context/ConfirmContext";
 import { useNotifications } from "../context/NotificationContext";
 import { apiFetch, API_BASE } from "../lib/api";
 import { useTranslation } from "react-i18next";
+import { errorMessage } from "../lib/utils";
 
 const RATING_LABEL_KEYS = [
   "settings.support.rating.veryPoor",
@@ -102,6 +103,7 @@ function ProfileSection() {
   }, [username]);
 
   async function handleAvatarUpload(file: File) {
+    if (!user) return;
     const ext = file.name.split(".").pop();
     const MAX_FILE_SIZE = 2 * 1024 * 1024;
     const STORAGE_PATH = `${user.id}/avatar.${ext}`;
@@ -188,8 +190,8 @@ function ProfileSection() {
       await apiFetch(`${API_BASE}/account/`, { method: "DELETE" });
       await supabase.auth.signOut();
       navigate("/login");
-    } catch (err: any) {
-      toast.error(err?.message || t("settings.toastDeleteFailed"));
+    } catch (err) {
+      toast.error(errorMessage(err) || t("settings.toastDeleteFailed"));
     } finally {
       setDeleting(false);
     }
@@ -783,8 +785,8 @@ function DataPrivacySection() {
           });
           await refreshNotifications();
           toast.success(t("settings.toastNotificationsCleared"));
-        } catch (err: any) {
-          toast.error(err?.message || t("settings.support.sendError"));
+        } catch (err) {
+          toast.error(errorMessage(err) || t("settings.support.sendError"));
         }
       },
     },
@@ -798,8 +800,8 @@ function DataPrivacySection() {
             method: "DELETE",
           });
           toast.success(t("settings.dataPrivacy.transactionsCleared"));
-        } catch (err: any) {
-          toast.error(err?.message || t("settings.support.sendError"));
+        } catch (err) {
+          toast.error(errorMessage(err) || t("settings.support.sendError"));
         }
       },
     },
@@ -813,8 +815,8 @@ function DataPrivacySection() {
             method: "DELETE",
           });
           toast.success(t("settings.dataPrivacy.budgetsCleared"));
-        } catch (err: any) {
-          toast.error(err?.message || t("settings.support.sendError"));
+        } catch (err) {
+          toast.error(errorMessage(err) || t("settings.support.sendError"));
         }
       },
     },
@@ -937,8 +939,8 @@ function SupportSection() {
       toast.success(t("settings.support.sendSuccess"));
       setRating(null);
       setFeedback("");
-    } catch (err: any) {
-      toast.error(err?.text || err?.message || t("settings.support.sendError"));
+    } catch (err) {
+      toast.error(errorMessage(err) || errorMessage(err) || t("settings.support.sendError"));
     } finally {
       setSending(false);
     }
