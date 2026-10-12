@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.database import (
@@ -7,13 +8,22 @@ from core.database import (
 )
 from routers import transactions,budgets,categories,goals,settings,export,currency,notifications,delete_account,mascot,advisor
 import models.chat_session  # noqa: F401 — ensures ChatSession is registered before create_all
+import models.coin_reward  # noqa: F401 — ensures CoinReward is registered before create_all
 from core.auth import fetch_jwks
 from core.limiter import limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 
 frontend_url = os.getenv("FRONTEND_URL")
-app = FastAPI()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await fetch_jwks()  # cache Supabase signing keys once at startup
+    yield
+
+
+app = FastAPI(title="PawPurse API", lifespan=lifespan)
 origins = [
     "http://localhost:5173",
     "http://localhost:5174",
@@ -30,10 +40,6 @@ app.add_middleware(
     allow_methods=["*"], #allow all HTTP methods (GET,POST,ect)
     allow_headers=["*"], #allow all headers
 )
-@app.on_event("startup")
-async def startup_event():
-    await fetch_jwks()
-
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.include_router(transactions.router)

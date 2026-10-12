@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import supabase from "../lib/supabaseClient";
+import { errorMessage } from "../lib/utils";
 
 const RATING_EMOJIS = ["😔", "😕", "😐", "🙂", "😍"] as const;
 const RATING_LABEL_KEYS = [
@@ -65,8 +66,8 @@ function RatingPopup() {
       await markRated();
       toast.success(t("ratingPopup.thanks"));
       setOpen(false);
-    } catch (err: any) {
-      toast.error(err?.text || err?.message || t("settings.support.sendError"));
+    } catch (err) {
+      toast.error(errorMessage(err) || errorMessage(err) || t("settings.support.sendError"));
     } finally {
       setSubmitting(false);
     }

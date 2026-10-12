@@ -6,11 +6,12 @@ import {
   useContext,
   useRef,
 } from "react";
+import type { Session, User } from "@supabase/supabase-js";
 import supabase from "../lib/supabaseClient";
 
 type AuthContextValue = {
-  user: any;
-  session: any;
+  user: User | null;
+  session: Session | null;
   loading: boolean;
   isRecovering: boolean;
   setIsRecovering: (v: boolean) => void;
@@ -20,7 +21,7 @@ type AuthContextValue = {
 };
 
 //container holds the shape of data that will be shared globally
-export const AuthContext = createContext<AuthContextValue>({
+const AuthContext = createContext<AuthContextValue>({
   user: null,
   session: null,
   loading: true,
@@ -57,7 +58,7 @@ function detectInitialRecovery(): boolean {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<any | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [isRecovering, setIsRecovering] = useState<boolean>(
     detectInitialRecovery,

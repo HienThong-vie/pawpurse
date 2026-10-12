@@ -23,9 +23,9 @@ export async function apiFetch(
   let response: Response;
   try {
     response = await fetch(url, { ...options, headers });
-  } catch (err: any) {
+  } catch (err) {
     console.error(`API call failed: ${url}`, err);
-    throw new Error(err?.message ?? "Network error");
+    throw new Error(err instanceof Error ? err.message : "Network error");
   }
   if (!response.ok) {
     let detail = "";

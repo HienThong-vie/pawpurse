@@ -1,10 +1,19 @@
+import math
+from datetime import date, datetime, time, timezone
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List
 from models.mascot import Mascot
+from models.budget import Budget
+from models.transaction import Transaction
+from models.coin_reward import CoinReward
+from core.periods import period_bounds, previous_period_bounds
+from core.currency import get_exchange_rates, convert_amount
 from schemas.mascot import (
     MascotResponse,
-    MascotCoinsUpdate,
+    BudgetReward,
+    BudgetRewardsResponse,
     MascotBuyRequest,
     MascotEquipRequest,
     ShopBedResponse,
@@ -51,10 +60,12 @@ def get_mascot(
         # supabase-py returns an object with .user; fall back to dict access.
         user_obj = getattr(result, "user", None) or result.get("user")  # type: ignore
         metadata = getattr(user_obj, "user_metadata", None) or {}
-    except Exception as e:
+    except Exception:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
-            detail=f"Unable to read user metadata for mascot creation: {e}",
+            detail="Unable to read user metadata for mascot creation",
         )
 
     companion_type = metadata.get("companion") or metadata.get("companion_type")
@@ -76,19 +87,77 @@ def get_mascot(
     return mascot
 
 
-@router.patch("/coins", response_model=MascotResponse)
-def add_coins(
-    data: MascotCoinsUpdate,
+@router.post("/rewards/budgets", response_model=BudgetRewardsResponse)
+async def claim_budget_rewards(
     user_id: str = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Award coins for money saved under each budget in its previous period.
+
+    Coins are computed entirely server-side. Each budget is evaluated at most once
+    per period; the first time a budget is seen only a baseline row is recorded,
+    so a budget created mid-period can't be rewarded for a period it didn't cover.
+    Full budget left unspent = 10 coins, scaling down linearly.
+    """
     mascot = db.query(Mascot).filter(Mascot.user_id == user_id).first()
     if not mascot:
-        raise HTTPException(status_code=404, detail="Mascot not found")
-    mascot.total_coins += data.coins
-    db.commit()
-    db.refresh(mascot)
-    return mascot
+        return BudgetRewardsResponse(coins_awarded=0, rewards=[])
+
+    budgets = db.query(Budget).filter(Budget.user_id == user_id).all()
+    today = date.today()
+    rates = None
+    rewards: List[BudgetReward] = []
+
+    for budget in budgets:
+        current_start, _ = period_bounds(budget.period, today)
+        evaluated = db.query(CoinReward).filter(
+            CoinReward.user_id == user_id, CoinReward.budget_id == budget.id
+        )
+        if evaluated.filter(CoinReward.period_start == current_start).first():
+            continue  # already evaluated this period
+
+        coins = 0
+        if evaluated.first():  # seen in an earlier period, so the previous period is real
+            prev_start, prev_end = previous_period_bounds(budget.period, today)
+            transactions = db.query(Transaction).filter(
+                Transaction.user_id == user_id,
+                Transaction.category == budget.category,
+                Transaction.type == "expense",
+                Transaction.date >= datetime.combine(prev_start, time.min, tzinfo=timezone.utc),
+                Transaction.date < datetime.combine(prev_end, time.min, tzinfo=timezone.utc),
+            ).all()
+            spent = 0.0
+            for t in transactions:
+                from_currency = t.currency or "USD"
+                if from_currency == budget.currency:
+                    spent += t.amount
+                else:
+                    rates = rates or await get_exchange_rates()
+                    spent += convert_amount(t.amount, from_currency, budget.currency, rates)
+            saved = budget.limit - spent
+            if budget.limit > 0 and saved > 0:
+                coins = math.floor(saved / budget.limit * 10)
+
+        db.add(CoinReward(
+            user_id=user_id, budget_id=budget.id, period_start=current_start, coins=coins
+        ))
+        try:
+            db.flush()
+        except IntegrityError:
+            # A concurrent request already evaluated this budget/period.
+            db.rollback()
+            continue
+        if coins > 0:
+            # Atomic increment — avoids lost updates between concurrent requests.
+            db.query(Mascot).filter(Mascot.id == mascot.id).update(
+                {Mascot.total_coins: Mascot.total_coins + coins}, synchronize_session=False
+            )
+            rewards.append(BudgetReward(budget_id=budget.id, category=budget.category, coins=coins))
+        db.commit()
+
+    return BudgetRewardsResponse(
+        coins_awarded=sum(r.coins for r in rewards), rewards=rewards
+    )
 
 
 @router.post("/buy", response_model=MascotResponse)

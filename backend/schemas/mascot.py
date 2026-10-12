@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, computed_field, Field
+from pydantic import BaseModel, ConfigDict, computed_field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
@@ -25,8 +25,15 @@ class MascotResponse(BaseModel):
         return self.total_coins - self.spent_coins
 
 
-class MascotCoinsUpdate(BaseModel):
-    coins: int = Field(..., gt=0, description="Number of coins to add (must be > 0)")
+class BudgetReward(BaseModel):
+    budget_id: int
+    category: str
+    coins: int
+
+
+class BudgetRewardsResponse(BaseModel):
+    coins_awarded: int
+    rewards: List[BudgetReward]
 
 
 class MascotBuyRequest(BaseModel):

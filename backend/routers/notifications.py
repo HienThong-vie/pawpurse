@@ -57,6 +57,21 @@ def mark_all_read(
     return {"message": "All notifications marked as read"}
 
 
+# Declared before /{notification_id} so "clear-all" isn't parsed as an id.
+@router.delete("/clear-all")
+def clear_all(
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    deleted = (
+        db.query(Notification)
+        .filter(Notification.user_id == user_id)
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"message": "All notifications deleted", "count": deleted}
+
+
 @router.patch("/{notification_id}/read", response_model=NotificationResponse)
 def mark_read(
     notification_id: int,

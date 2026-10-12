@@ -18,8 +18,10 @@ import { useToast } from "../context/ToastContext";
 import { useConfirm } from "../context/ConfirmContext";
 import { useTheme } from "../context/ThemeContext";
 import { useTranslation } from "react-i18next";
-import { formatCurrency, formatDate, fetchBaseCurrency } from "../lib/utils";
+import { formatCurrency, formatDate, fetchBaseCurrency, errorMessage } from "../lib/utils";
 import { apiFetch, API_BASE } from "../lib/api";
+import { useModalTransition } from "../lib/useModalTransition";
+import type { Budget as BudgetItem, Category, Transaction } from "../lib/types";
 import ErrorBanner from "../components/ErrorBanner";
 
 type FieldErrors = {
@@ -35,7 +37,7 @@ type SortKey =
   | "amount-low"
   | "category-az";
 
-function applySort(arr: any[], sortBy: SortKey): any[] {
+function applySort(arr: Transaction[], sortBy: SortKey): Transaction[] {
   const sorted = [...arr];
   switch (sortBy) {
     case "amount-high":
@@ -76,11 +78,11 @@ type TransactionFormProps = {
   setFieldErrors: Dispatch<SetStateAction<FieldErrors>>;
   submitting: boolean;
   editId: number | null;
-  categories: any[];
+  categories: Category[];
   onSubmit: () => void;
   onCancel: () => void;
   onAddCategory: (name: string, emoji: string) => Promise<void>;
-  onDeleteCategory: (id: any) => Promise<void>;
+  onDeleteCategory: (id: number) => Promise<void>;
   onUpdateCategoryEmoji: (id: number, emoji: string) => Promise<void>;
 };
 
@@ -564,24 +566,8 @@ function TransactionModal({
   title,
   children,
 }: TransactionModalProps) {
-  const [rendered, setRendered] = useState(false);
-  const [visible, setVisible] = useState(false);
+  const { rendered, visible } = useModalTransition(open);
   const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (open) {
-      setRendered(true);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setVisible(true);
-        });
-      });
-    } else {
-      setVisible(false);
-      const t = setTimeout(() => setRendered(false), 250);
-      return () => clearTimeout(t);
-    }
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -681,8 +667,8 @@ function Transactions() {
   const { theme } = useTheme();
   const { t } = useTranslation();
 
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [editId, setEditId] = useState<number | null>(null);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [menuPos, setMenuPos] = useState<{
@@ -695,7 +681,7 @@ function Transactions() {
 
   const emojiByCategory = useMemo(() => {
     const map: Record<string, string> = {};
-    categories.forEach((c: any) => {
+    categories.forEach((c) => {
       if (c?.name && c?.emoji) map[c.name.toLowerCase()] = c.emoji;
     });
     return map;
@@ -717,9 +703,7 @@ function Transactions() {
   const [note, setNote] = useState("");
   const [date, setDate] = useState("");
   const [is_recurring, setIsRecurring] = useState(false);
-  const [recurring_interval, setRecurringInterval] = useState(
-    t("budget.periodMonthly"),
-  );
+  const [recurring_interval, setRecurringInterval] = useState("monthly");
   const [baseCurrency, setBaseCurrency] = useState<string>("USD");
 
   // Inline bar dropdown state (xl+ only)
@@ -795,11 +779,11 @@ function Transactions() {
         );
         const data = await response.json();
         setTransactions(data);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        setError(errorMessage(err));
       }
     },
-    [user?.id, baseCurrency],
+    [baseCurrency],
   );
 
   const fetchCategories = useCallback(async () => {
@@ -809,10 +793,10 @@ function Transactions() {
       });
       const data = await response.json();
       setCategories(data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     }
-  }, [user?.id]);
+  }, []);
 
   useEffect(() => {
     async function init() {
@@ -825,8 +809,8 @@ function Transactions() {
         const transData = await transResponse.json();
         setTransactions(transData);
         fetchCategories();
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        setError(errorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -928,14 +912,13 @@ function Transactions() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            user_id: user?.id,
             amount: amt,
             type,
             category,
             note,
             date: `${effectiveDate}T${currentTime}`,
             is_recurring,
-            recurring_interval,
+            recurring_interval: is_recurring ? recurring_interval : null,
             currency: baseCurrency,
           }),
         });
@@ -945,14 +928,13 @@ function Transactions() {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            user_id: user?.id,
             amount: amt,
             type,
             category,
             note,
             date: `${effectiveDate}T${currentTime}`,
             is_recurring,
-            recurring_interval,
+            recurring_interval: is_recurring ? recurring_interval : null,
           }),
         });
         toast.success(t("transactions.toastUpdated"));
@@ -960,8 +942,8 @@ function Transactions() {
       fetchTransactions();
       resetForm();
       setShowModal(false);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -981,12 +963,12 @@ function Transactions() {
       });
       fetchTransactions();
       toast.success(t("transactions.toastDeleted"));
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     }
   }
 
-  function handleEdit(transaction: any) {
+  function handleEdit(transaction: Transaction) {
     setEditId(transaction.id);
     setAmount(String(transaction.amount));
     setType(transaction.type);
@@ -994,6 +976,7 @@ function Transactions() {
     setNote(transaction.note || "");
     setDate(transaction.date?.split("T")[0] || "");
     setIsRecurring(transaction.is_recurring || false);
+    setRecurringInterval(transaction.recurring_interval || "monthly");
     if (window.innerWidth < 1280) {
       setShowModal(true);
     } else {
@@ -1006,13 +989,13 @@ function Transactions() {
       await apiFetch(`${API_BASE}/categories/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user?.id, name, emoji }),
+        body: JSON.stringify({ name, emoji }),
       });
       toast.success("Category added");
       await fetchCategories();
       setCategory(name);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
       throw err;
     }
   }
@@ -1025,8 +1008,8 @@ function Transactions() {
         body: JSON.stringify({ emoji }),
       });
       await fetchCategories();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     }
   }
 
@@ -1055,7 +1038,7 @@ function Transactions() {
     setEmojiEditingId(null);
   }
 
-  async function handleDeleteCategory(category_id: any) {
+  async function handleDeleteCategory(category_id: number) {
     const cat = categories.find((c) => c.id === category_id);
     if (!cat) return;
 
@@ -1065,10 +1048,8 @@ function Transactions() {
       const budgetsRes = await apiFetch(
         `${API_BASE}/budgets/?base_currency=${baseCurrency}`,
       );
-      const budgetsData = await budgetsRes.json();
-      const relatedBudgets = budgetsData.filter(
-        (b: any) => b.category === cat.name,
-      );
+      const budgetsData: BudgetItem[] = await budgetsRes.json();
+      const relatedBudgets = budgetsData.filter((b) => b.category === cat.name);
 
       const txCount = relatedTx.length;
       const budgetCount = relatedBudgets.length;
@@ -1090,7 +1071,7 @@ function Transactions() {
               method: "DELETE",
             }),
           ),
-          ...relatedBudgets.map((b: any) =>
+          ...relatedBudgets.map((b) =>
             apiFetch(`${API_BASE}/budgets/${b.id}`, {
               method: "DELETE",
             }),
@@ -1104,8 +1085,8 @@ function Transactions() {
       toast.success(`Category "${cat.name}" deleted`);
       fetchCategories();
       fetchTransactions();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     }
   }
 
@@ -1926,7 +1907,7 @@ function Transactions() {
               >
                 {(() => {
                   const tx = displayedTransactions.find(
-                    (t: any) => t.id === openMenuId,
+                    (t) => t.id === openMenuId,
                   );
                   if (!tx) return null;
                   return (

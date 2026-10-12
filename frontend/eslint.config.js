@@ -20,4 +20,13 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Context modules intentionally co-locate each Provider with its hook
+    // (useAuth, useToast, ...). That only affects dev-time Fast Refresh for
+    // these files, so the rule is relaxed here rather than splitting them.
+    files: ['src/context/**/*.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

@@ -56,7 +56,7 @@ function Login() {
     setForgotSubmitting(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: "http://localhost:5173",
+        redirectTo: window.location.origin,
       });
       if (error) {
         toast.error(error.message);
