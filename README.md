@@ -1,6 +1,6 @@
 # PawPurse 🐾
 
-[![CI](https://github.com/HienThong-vie/Smart-Financial-Tracker-Product/actions/workflows/ci.yml/badge.svg)](https://github.com/HienThong-vie/Smart-Financial-Tracker-Product/actions/workflows/ci.yml)
+[![CI](https://github.com/HienThong-vie/pawpurse/actions/workflows/ci.yml/badge.svg)](https://github.com/HienThong-vie/pawpurse/actions/workflows/ci.yml)
 
 **A personal finance tracker with an AI advisor that can act on your data, and a pet companion that rewards you for staying under budget.**
 
