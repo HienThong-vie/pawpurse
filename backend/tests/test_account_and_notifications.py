@@ -35,3 +35,14 @@ def test_clear_all_notifications_only_clears_own(client, db):
     assert r.status_code == 200 and r.json()["count"] == 2
     db.expire_all()
     assert db.query(Notification).filter(Notification.user_id == "bob").count() == 1
+
+
+def test_demo_account_cannot_be_deleted(client, db, monkeypatch):
+    admin = MagicMock()
+    monkeypatch.setattr(routers.delete_account, "get_admin_client", lambda: admin)
+    monkeypatch.setenv("DEMO_USER_ID", "demo")
+    db.add(Transaction(user_id="demo", amount=1, type="expense", category="x"))
+    db.commit()
+    assert client.delete("/account/", headers=auth("demo")).status_code == 403
+    admin.auth.admin.delete_user.assert_not_called()
+    assert db.query(Transaction).filter(Transaction.user_id == "demo").count() == 1

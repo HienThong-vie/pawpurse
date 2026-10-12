@@ -87,6 +87,8 @@ npm run dev                       # http://localhost:5173
 
 Tables are created automatically on first start.
 
+**Demo data:** `DEMO_PASSWORD=... python scripts/seed_demo.py --email demo@pawpurse.app` (from `backend/`) creates a confirmed demo user with onboarding already done and three months of sample transactions, budgets, goals and a companion. Re-running it resets the account. Set the printed `DEMO_USER_ID` on the backend so visitors can't delete it.
+
 ## Testing
 
 ```bash

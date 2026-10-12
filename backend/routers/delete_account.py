@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from core.database import get_db
@@ -23,6 +24,9 @@ def delete_account(
     user_id: str = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # The shared demo account (scripts/seed_demo.py) must survive visitors.
+    if user_id == os.getenv("DEMO_USER_ID"):
+        raise HTTPException(status_code=403, detail="The demo account can't be deleted")
     try:
         # Wipe all user-owned rows. Bulk-delete with synchronize_session=False
         # because we don't need the in-memory session to track the deletes.
