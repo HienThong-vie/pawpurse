@@ -40,6 +40,13 @@ export function useAuth() {
 const RECOVERY_KEY = "smartfinance.isRecovering";
 const LAST_SIGNIN_KEY = "smartfinance.lastSignInAt";
 
+// Compare timestamps as instants, not strings: the sign-in response carries
+// nanosecond precision while the session restored on the next page load is
+// truncated to microseconds, so the strings differ for the same sign-in.
+function sameInstant(a: string | null | undefined, b: string | null | undefined) {
+  return !!a && !!b && Date.parse(a) === Date.parse(b);
+}
+
 // Detect recovery synchronously at mount, before supabase-js's async URL
 // parser fires PASSWORD_RECOVERY. Two signals:
 //   1. URL contains "type=recovery" — covers the initial email-link landing
@@ -85,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setLoading(false);
       if (event === "PASSWORD_RECOVERY") {
@@ -128,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         if (
           current &&
-          current !== lastSeen &&
+          !sameInstant(current, lastSeen) &&
           !incrementingRef.current &&
           !isNewSignup
         ) {
@@ -141,15 +148,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const currentCount = Number(
             session.user.user_metadata?.login_count ?? 0,
           );
-          try {
-            await supabase.auth.updateUser({
-              data: { login_count: currentCount + 1 },
-            });
-          } catch {
-            // best-effort — we'll try again on next sign-in
-          } finally {
-            incrementingRef.current = false;
-          }
+          // Deferred on purpose: supabase-js runs this callback while holding its
+          // auth lock, so awaiting another auth call here deadlocks the client
+          // (every request then waits forever on getSession()).
+          setTimeout(() => {
+            supabase.auth
+              .updateUser({ data: { login_count: currentCount + 1 } })
+              .catch(() => {
+                // best-effort — we'll try again on next sign-in
+              })
+              .finally(() => {
+                incrementingRef.current = false;
+              });
+          }, 0);
         }
       }
     });
