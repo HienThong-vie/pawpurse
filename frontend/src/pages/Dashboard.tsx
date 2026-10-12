@@ -383,6 +383,7 @@ function Dashboard() {
       [...transactions]
         .sort(
           (a, b) =>
+            new Date(b.date).getTime() - new Date(a.date).getTime() ||
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         )
         .slice(0, 5),
@@ -765,7 +766,7 @@ function Dashboard() {
                         {t.category}
                       </p>
                       <p className="text-xs text-gray-400 dark:text-[#666]">
-                        {formatDate(t.created_at)}
+                        {formatDate(t.date)}
                         {t.note && (
                           <span className="ml-1.5 text-gray-400 dark:text-[#555]">
                             ·{" "}
