@@ -35,3 +35,11 @@ def test_unknown_key_id_is_rejected(client):
 
 def test_garbage_token_is_rejected(client):
     assert client.get("/transactions/", headers={"Authorization": "Bearer not-a-jwt"}).status_code == 401
+
+
+def test_database_url_scheme_is_normalized():
+    from core.database import normalize_database_url
+
+    assert normalize_database_url("postgres://u:p@h/db") == "postgresql://u:p@h/db"
+    assert normalize_database_url("postgresql://u:p@h/db") == "postgresql://u:p@h/db"
+    assert normalize_database_url("sqlite://") == "sqlite://"

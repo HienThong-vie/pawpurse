@@ -89,6 +89,12 @@ Tables are created automatically on first start.
 
 **Demo data:** `DEMO_PASSWORD=... python scripts/seed_demo.py --email demo@pawpurse.app` (from `backend/`) creates a confirmed demo user with onboarding already done and three months of sample transactions, budgets, goals and a companion. Re-running it resets the account. Set the printed `DEMO_USER_ID` on the backend so visitors can't delete it.
 
+## Deploying
+
+- **Frontend (Vercel):** root directory `frontend/`, Vite preset. Set the `VITE_*` variables from `frontend/.env.example` before building. `frontend/vercel.json` already rewrites all routes to `index.html`.
+- **Backend (Render):** `render.yaml` is a Blueprint for the API and a Postgres database. In Render choose New → Blueprint, pick this repo, and fill in the prompted secrets (see `backend/.env.example`). On the free plan the API sleeps when idle, so the first request after a pause takes about a minute, and the free database expires after 30 days.
+- **Auth (Supabase):** the project must sign tokens with an ECC (P-256) key, and its Site URL / Redirect URLs must include the Vercel domain. The `avatars` storage bucket needs per-user access policies.
+
 ## Testing
 
 ```bash
